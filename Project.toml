@@ -1,0 +1,13 @@
+name = "SurfaceProgrammableMaterial"
+uuid = "0541b71a-8fa6-4cd9-b610-37af9fd1fa9e"
+authors = ["Rose_max111 <luyimingboy@163.com> and contributors"]
+version = "1.0.0-DEV"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
