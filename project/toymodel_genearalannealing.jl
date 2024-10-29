@@ -282,11 +282,11 @@ device = parse(Int, device)
 # # @info "this time try width = $width, depth = $depth, λ = $λ, gauss_width = $(gauss_width)"
 CUDA.device!(device)
 # evaluate_time = evaluate_50percent_time_reverse_gpu(Exponentialtype(), width, depth, gauss_width, λ)
-evaluate_time = evaluate_50percent_time_fixlayer_gpu(width, depth, false)
+evaluate_time = evaluate_50percent_time_gpu(Exponentialtype(), width, depth, gauss_width, λ)
 
 # # # @info "width = $width, depth = $depth, λ = $λ, evaluate_time = $evaluate_time"
 
-filepath = joinpath(@__DIR__, "data_toymodel_fixoutput/W=$(width)_D=$(depth)_GW=$(gauss_width)_E=$(λ).txt")
+filepath = joinpath(@__DIR__, "data_toymodel_pulse/W=$(width)_D=$(depth)_GW=$(gauss_width)_E=$(λ).txt")
 open(filepath,"w") do file
     println(file, evaluate_time)
 end
