@@ -2,5 +2,6 @@ using SurfaceProgrammableMaterial
 using Test
 
 @testset "SurfaceProgrammableMaterial.jl" begin
-    # Write your tests here.
+    include("ca1d.jl")
+    include("cusa.jl")
 end
