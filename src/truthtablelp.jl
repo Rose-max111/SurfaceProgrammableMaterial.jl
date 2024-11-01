@@ -84,30 +84,6 @@ function find_proper_model(ruleid, total_atoms)
     return -1, false
 end
 
-function individualsolver()
-    model = @suppress Model(COPT.Optimizer)
-    # set_attribute(model, "output_flag", false)
-    @variable(model, x[1:15+6])
-    open("test.txt","r") do io
-        for t in 1:7
-            weights = parse.(Int, split(readline(io)))
-            @constraint(model, sum(weights[i] * x[i] for i in 1:length(weights)) == 0)
-        end
-        for t in 8:63
-            weights = parse.(Int, split(readline(io)))
-            @constraint(model, sum(weights[i] * x[i] for i in 1:length(weights)) <= -0.1)
-        end
-    end
-    @objective(model, Min, x[1])
-    # @info "$model"
-    @suppress optimize!(model)
-    if is_solved_and_feasible(model)
-        @info "yes"
-    else
-        @info "no"
-    end
-end
-
 function query_model(ruleid, total_atoms)
     msk, weights = find_proper_model(ruleid, total_atoms)
     if msk == -1
