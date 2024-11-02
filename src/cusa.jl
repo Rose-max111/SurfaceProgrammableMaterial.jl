@@ -162,19 +162,6 @@ function step_parallel!(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian,
     state
 end
 
-
-function track_equilibration!(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian, state::AbstractMatrix, energy_gradient::AbstractArray, tempscale = 4 .- (1:100 .-1) * 0.04)
-    # NOTE: do we really need niters? or just set it to 1?
-    for Temp in tempscale
-        # NOTE: do we really need to shuffle the nodes?
-        for _ in 1:natom(sa)
-        # for node in shuffle!(Vector(1:natom(sa)))
-            step!(rule, sa, state, energy_gradient, Temp)
-        end
-    end
-    return sa
-end
-
 function toymodel_pulse(rule::TempcomputeRule, sa::SimulatedAnnealingHamiltonian,
                             pulse_amplitude::Float64,
                             pulse_width::Float64,
@@ -183,7 +170,7 @@ function toymodel_pulse(rule::TempcomputeRule, sa::SimulatedAnnealingHamiltonian
     # amplitude * e^(- (1 /width) * (x-middle_position)^2)
     # eachposition = Tuple([pulse_amplitude * gradient^(- (1.0/pulse_width) * abs(i-middle_position)) + 1e-5 for i in 1:sa.m-1])
     eachposition = Tuple([temp_calculate(rule, pulse_amplitude, pulse_width, middle_position, gradient, i) for i in 1:sa.m-1])
-    return eachposition
+    return eachposition 
 end
 temp_calculate(::Gaussiantype, pulse_amplitude::Float64,
                             pulse_width::Float64,
@@ -241,7 +228,6 @@ function track_equilibration_pulse_cpu!(rule::TransitionRule,
     @info "midposition = $midposition"
     @info "each_movement = $each_movement"
 
-    single_layer_temp = []
     for t in 1:annealing_time
         singlebatch_temp = toymodel_pulse(temprule, sa, pulse_amplitude, pulse_width, midposition, pulse_gradient)
         Temp = fill((singlebatch_temp), size(state, 2))
@@ -256,9 +242,7 @@ function track_equilibration_pulse_cpu!(rule::TransitionRule,
             end
         end
         midposition += each_movement
-        push!(single_layer_temp, singlebatch_temp[1])
     end
-    return single_layer_temp
 end
 
 function track_equilibration_pulse_gpu!(rule::TransitionRule,
