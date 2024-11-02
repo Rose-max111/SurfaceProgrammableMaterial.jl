@@ -1,4 +1,5 @@
 using Test, CUDA
+using SurfaceProgrammableMaterial
 using SurfaceProgrammableMaterial: natom, atoms, hasparent
 using SurfaceProgrammableMaterial: evaluate_parent, calculate_energy
 using SurfaceProgrammableMaterial: parent_nodes, child_nodes
@@ -102,8 +103,16 @@ end
     
     state_energy = [calculate_energy(sa, state, fill(1.0, nbatch), i) for i in 1:nbatch]
     success = count(x -> x == 0, state_energy)
-    @info success
     @test abs((success / nbatch) - 0.55) <= 0.1
+
+    sequential_flip_state = random_state(sa, nbatch)
+    track_equilibration_pulse_cpu!(HeatBath(), Exponentialtype(),
+     sa, sequential_flip_state, pulse_gradient, pulse_amplitude, pulse_width, annealing_time;
+      accelerate_flip = false)
+    sequential_flip_state_energy = [calculate_energy(sa, sequential_flip_state, fill(1.0, nbatch), i) for i in 1:nbatch]
+    sequential_flip_success = count(x -> x==0, sequential_flip_state_energy)
+    @info success, sequential_flip_success
+    @test abs((sequential_flip_success - success) / nbatch) <= 0.03
 end
 
 @testset "pulse_equilibration_gpu" begin
