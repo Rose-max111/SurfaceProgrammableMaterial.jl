@@ -43,6 +43,12 @@ function check_vaild(total_atoms, weights, ruleid, msk)
     end
 end
 
+
+@testset "set_value" begin
+    @test SurfaceProgrammableMaterial.set_value(0b1010, 0b1100, 0b0100) == 0b0110
+    @test SurfaceProgrammableMaterial.set_value(0b1010, 0b1001, 0b1001) == 0b1011
+end
+
 @testset "query_model" begin
     natoms = Vector{Vector{Int}}()
     previous = Vector{Int}()
@@ -50,7 +56,7 @@ end
         ok = Vector{Int}()
         for id in 0:255
             if (id in previous) == false
-                msk, weights = query_model(id, total_atoms)
+                msk, weights = query_model(CellularAutomata1D(id), total_atoms)
                 if msk != -1
                     push!(ok, id)
                     push!(previous, id)
