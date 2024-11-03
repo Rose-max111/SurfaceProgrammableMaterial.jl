@@ -2,7 +2,6 @@ module SurfaceProgrammableMaterial
 
 using BitBasis
 using CairoMakie
-using CUDA
 using Random
 using JuMP
 using GenericTensorNetworks
@@ -17,7 +16,8 @@ export TransitionRule, HeatBath, Metropolis
 export SimulatedAnnealingHamiltonian
 
 # Export cellular automata transition ruleid
-export generic_logic_grate
+export CellularAutomata1D
+export automatarule
 
 # Export track_equilibration method
 export track_equilibration_pulse_cpu!, track_equilibration_pulse_gpu!
@@ -30,7 +30,7 @@ export find_proper_model, query_model
 
 include("superstruct.jl")
 include("ca1d.jl")
-include("cusa.jl")
+include("simulated_annealing.jl")
 include("truthtablelp.jl")
 
 end

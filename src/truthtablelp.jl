@@ -42,9 +42,9 @@ function find_proper_model(ruleid, total_atoms)
             for q in [0,1]
                 for r in [0,1]
                     cnt += 1
-                    st = [p, q, r, generic_logic_grate(p, q, r, ruleid)]
+                    st = [p, q, r, automatarule(p, q, r, ruleid)]
                     for t in msk
-                        push!(st, (t>>(cnt-1))&1)
+                        push!(st, (t>>(cnt-1)) & 1)
                     end
                     push!(proper_states, st)
                 end

@@ -17,7 +17,7 @@ function check_vaild(total_atoms, weights, ruleid, msk)
         for q in [0, 1]
             for r in [0, 1]
                 cnt += 1
-                state = [p, q, r, generic_logic_grate(p, q, r, ruleid)]
+                state = [p, q, r, automatarule(p, q, r, ruleid)]
                 for i in 1:total_atoms-4
                     push!(state, (msk[i]>>(cnt-1))&1)
                 end
