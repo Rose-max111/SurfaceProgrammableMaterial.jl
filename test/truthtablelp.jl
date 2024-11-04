@@ -59,3 +59,11 @@ end
         push!(natoms, ok)
     end
 end
+
+@testset "logic gate" begin
+    @test query_model(BasicGate{:¬}(), 2) !== nothing
+    @test query_model(BasicGate{:⊻}(), 3) === nothing
+    @test query_model(BasicGate{:⊻}(), 4) !== nothing  # it is known that xor can not be implemented in 4 qubits
+    @test query_model(BasicGate{:∧}(), 3) !== nothing
+    @test query_model(BasicGate{:∨}(), 3) !== nothing
+end

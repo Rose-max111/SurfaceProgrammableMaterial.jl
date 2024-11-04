@@ -15,6 +15,9 @@ export TempcomputeRule, Gaussiantype, Exponentialtype
 export TransitionRule, HeatBath, Metropolis
 export SimulatedAnnealingHamiltonian
 
+# Basic gate
+export BasicGate
+
 # Export cellular automata transition ruleid
 export CellularAutomata1D
 export automatarule
@@ -29,6 +32,7 @@ export track_equilibration_fixedlayer_cpu!, track_equilibration_fixedlayer_gpu!
 export query_model, nspin, ground_state, IsingGadget
 
 include("superstruct.jl")
+include("basicgate.jl")
 include("ca1d.jl")
 include("simulated_annealing.jl")
 include("truthtablelp.jl")

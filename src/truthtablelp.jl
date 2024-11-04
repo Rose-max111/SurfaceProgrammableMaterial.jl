@@ -42,9 +42,9 @@ function round_integer!(ig::IsingGadget)
 end
 
 function query_model(gate, nspin::Int; round_integer::Bool=true)
-    @assert nspin >= 4 "nspin ($nspin) must be at least 4"
-    nancilla = nspin - 4
     ni = nin(gate)
+    @assert nspin >= ni+1 "nspin ($nspin) must be at least $(ni+1)"
+    nancilla = nspin - ni - 1
     ground_states0 = [b | (gate(ntuple(i->readbit(b, i), ni)...) << ni) for b in 0:2^ni-1]  # TODO: the order has been changed!
     for ancilla_idx in 0:(2^(2^ni))^nancilla-1  # ancilla configurations: e.g. for ancilla (a, b), the configurations are (b7,..., b1, b0, a7,..., a1, a0)
         ground_states = copy(ground_states0)
