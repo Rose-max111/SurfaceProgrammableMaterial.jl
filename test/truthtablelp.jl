@@ -12,41 +12,28 @@ function check_vaild(total_atoms, weights, ruleid, msk)
     spproblem = GenericTensorNetwork(spgls)
     gs = GenericTensorNetworks.solve(spproblem, CountingMin())[]
     @test gs.c == 8.0
-    cnt = 0
-    for p in [0, 1]
-        for q in [0, 1]
-            for r in [0, 1]
-                cnt += 1
-                state = [p, q, r, automatarule(p, q, r, ruleid)]
-                for i in 1:total_atoms-4
-                    push!(state, (msk[i]>>(cnt-1))&1)
-                end
-                state .⊻= 1
-                stbit = StaticBitVector(state)
-                this_energy = spinglass_energy(spgls, stbit)
-                # @info "state = $(state.⊻1), energy = $this_energy"
-                @test this_energy == gs.n
-                my_energy = 0.0
-                iiid = 0
-                for i in 1:total_atoms
-                    for j in i+1:total_atoms
-                        iiid += 1
-                        my_energy += weights[iiid] * (state[i] == 1 ? -1 : 1) * (state[j] == 1 ? -1 : 1)
-                    end
-                end
-                for i in 1:total_atoms
-                    my_energy += weights[iiid+i] * (state[i] == 1 ? -1 : 1)
-                end
-                @test my_energy == gs.n
+    for k = 0:7
+        p, q, r = readbit(k, 1), readbit(k, 2), readbit(k, 3)
+        state = [p, q, r, automatarule(p, q, r, ruleid)]
+        for i in 1:total_atoms-4
+            push!(state, (msk[i]>>k)&1)
+        end
+        this_energy = spinglass_energy(spgls, state)
+        # @info "state = $(state.⊻1), energy = $this_energy"
+        @test this_energy == gs.n
+        my_energy = 0.0
+        iiid = 0
+        for i in 1:total_atoms
+            for j in i+1:total_atoms
+                iiid += 1
+                my_energy += weights[iiid] * (state[i] == 1 ? -1 : 1) * (state[j] == 1 ? -1 : 1)
             end
         end
+        for i in 1:total_atoms
+            my_energy += weights[iiid+i] * (state[i] == 1 ? -1 : 1)
+        end
+        @test my_energy == gs.n
     end
-end
-
-
-@testset "set_value" begin
-    @test SurfaceProgrammableMaterial.set_value(0b1010, 0b1100, 0b0100) == 0b0110
-    @test SurfaceProgrammableMaterial.set_value(0b1010, 0b1001, 0b1001) == 0b1011
 end
 
 @testset "query_model" begin
