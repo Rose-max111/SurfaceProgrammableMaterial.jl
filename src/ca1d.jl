@@ -1,6 +1,7 @@
 # e.g. rule 110 could be specified as `CellularAutomata1D{110}()`
 struct CellularAutomata1D{INT} end
 CellularAutomata1D(id::Int) = CellularAutomata1D{id}()
+nin(::CellularAutomata1D) = 3
 
 function automatarule(p, q, r, N)
     return (N >> (p << 2 | q << 1 | r)) & 1

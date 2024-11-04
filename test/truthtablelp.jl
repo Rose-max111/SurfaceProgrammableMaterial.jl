@@ -1,5 +1,5 @@
 using Test
-using SurfaceProgrammableMaterial
+using SurfaceProgrammableMaterial, BitBasis
 using GenericTensorNetworks
 
 function check_vaild(total_atoms, weights, ruleid, msk)
@@ -43,12 +43,12 @@ end
         ok = Vector{Int}()
         for id in 0:255
             if (id in previous) == false
-                msk, weights = query_model(CellularAutomata1D(id), total_atoms)
-                if msk != -1
+                res = query_model(CellularAutomata1D(id), total_atoms)
+                if res !== nothing
                     push!(ok, id)
                     push!(previous, id)
-                    @info "now testing ruleid = $id, total_atoms = $total_atoms, weights = $(weights)"
-                    check_vaild(total_atoms, weights, id, msk)
+                    @info "now testing ruleid = $id, total_atoms = $total_atoms"
+                    check_vaild(total_atoms, vcat(res.J, res.h), id, res.ancilla_idx)
                 end
             end
         end
