@@ -2,35 +2,39 @@ using Test
 using SurfaceProgrammableMaterial, BitBasis
 using GenericTensorNetworks
 
-function check_vaild(total_atoms, weights, ruleid, msk)
-    hyperedges = [[i, j] for i in 1:total_atoms for j in i+1:total_atoms]
-    for i in 1:total_atoms
+function check_vaild(ig::IsingGadget, ruleid)
+    # check ground states
+    a, b, c, d = ig.logical_spins
+    for i=1:length(ig.ground_states)
+        state = ground_state(ig, i)
+        @test automatarule(state[a], state[b], state[c], ruleid) == state[d]
+    end
+
+    # check model parameters
+    hyperedges = [[i, j] for i in 1:nspin(ig) for j in i+1:nspin(ig)]
+    for i in 1:nspin(ig)
         push!(hyperedges, [i])
     end
-    hyperweights = weights
-    spgls = SpinGlass(total_atoms, hyperedges, hyperweights)
+    hyperweights = vcat(ig.J, ig.h)
+    spgls = SpinGlass(nspin(ig), hyperedges, hyperweights)
     spproblem = GenericTensorNetwork(spgls)
     gs = GenericTensorNetworks.solve(spproblem, CountingMin())[]
     @test gs.c == 8.0
     for k = 0:7
-        p, q, r = readbit(k, 1), readbit(k, 2), readbit(k, 3)
-        state = [p, q, r, automatarule(p, q, r, ruleid)]
-        for i in 1:total_atoms-4
-            push!(state, (msk[i]>>k)&1)
-        end
+        state = ground_state(ig, k+1)
         this_energy = spinglass_energy(spgls, state)
         # @info "state = $(state.⊻1), energy = $this_energy"
         @test this_energy == gs.n
         my_energy = 0.0
         iiid = 0
-        for i in 1:total_atoms
-            for j in i+1:total_atoms
+        for i in 1:nspin(ig)
+            for j in i+1:nspin(ig)
                 iiid += 1
-                my_energy += weights[iiid] * (state[i] == 1 ? -1 : 1) * (state[j] == 1 ? -1 : 1)
+                my_energy += ig.J[iiid] * (state[i] == 1 ? -1 : 1) * (state[j] == 1 ? -1 : 1)
             end
         end
-        for i in 1:total_atoms
-            my_energy += weights[iiid+i] * (state[i] == 1 ? -1 : 1)
+        for i in 1:nspin(ig)
+            my_energy += ig.h[i] * (state[i] == 1 ? -1 : 1)
         end
         @test my_energy == gs.n
     end
@@ -48,7 +52,7 @@ end
                     push!(ok, id)
                     push!(previous, id)
                     @info "now testing ruleid = $id, total_atoms = $total_atoms"
-                    check_vaild(total_atoms, vcat(res.J, res.h), id, res.ancilla_idx)
+                    check_vaild(res, id)
                 end
             end
         end

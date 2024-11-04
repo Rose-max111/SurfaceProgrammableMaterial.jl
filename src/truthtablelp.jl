@@ -15,10 +15,22 @@ end
 
 struct IsingGadget{T<:Real}
     logical_spins::Vector{Int}
-    ancilla_idx::Int
     J::Vector{T}
     h::Vector{T}
+    ground_states::Vector{Int}
 end
+nspin(ig::IsingGadget) = length(ig.h)
+ground_state(ig::IsingGadget, i::Int) = [readbit(ig.ground_states[i], j) for j in 1:nspin(ig)]
+function Base.show(io::IO, ig::IsingGadget)
+    print(io, typeof(ig))
+    print(io, "(
+    logical_spins = $(ig.logical_spins),
+    J = $(ig.J),
+    h = $(ig.h),
+    ground_states (little endian) = $(BitStr{nspin(ig)}.(ig.ground_states))
+)")
+end
+Base.show(io::IO, ::MIME"text/plain", ig::IsingGadget) = show(io, ig)
 
 # TODO: this function is not safe to use!
 function round_integer!(ig::IsingGadget)
@@ -44,7 +56,7 @@ function query_model(gate, nspin::Int; round_integer::Bool=true)
         if res !== nothing
             @assert length(res) == nspin * (nspin - 1) ÷ 2 + nspin
             J, h = res[1:nspin * (nspin - 1) ÷ 2], res[nspin * (nspin - 1) ÷ 2 + 1:end]
-            result = IsingGadget(collect(1:ni+1), ancilla_idx, J, h)
+            result = IsingGadget(collect(1:ni+1), J, h, ground_states)
             round_integer && round_integer!(result)
             return result
         end

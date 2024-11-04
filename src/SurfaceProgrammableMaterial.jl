@@ -26,7 +26,7 @@ export track_equilibration_collective_temperature_cpu!, track_equilibration_coll
 export track_equilibration_fixedlayer_cpu!, track_equilibration_fixedlayer_gpu!
 
 # Export truth_table_mapping in LP method
-export find_proper_model, query_model
+export query_model, nspin, ground_state, IsingGadget
 
 include("superstruct.jl")
 include("ca1d.jl")
