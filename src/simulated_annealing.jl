@@ -148,7 +148,9 @@ function update_temperature!(runtime::SARuntime, temprule::TemperatureGradient, 
     sa = runtime.hamiltonian
     each_movement = (dcut * 2 + sa.m) / (annealing_time - 1)
     singlebatch_temp = temperature_matrix(temprule, sa, reverse_direction ? sa.m + dcut - t * each_movement : -dcut + t * each_movement)
-    runtime.temperature .= repeat(vec(singlebatch_temp), 1, size(runtime.temperature, 2))
+    for ibatch in 1:size(runtime.temperature, 2)
+        runtime.temperature[:, ibatch] .= vec(singlebatch_temp)
+    end
 end
 function temperature_matrix(tg::TemperatureGradient, sa::SimulatedAnnealingHamiltonian, middle_position::Real)
     return [evaluate_temperature(tg, middle_position - j) for i in 1:sa.n, j in 1:sa.m]
