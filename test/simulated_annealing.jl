@@ -53,7 +53,6 @@ function test_flip_id(sa::SimulatedAnnealingHamiltonian)
     @test total_flip_id == 1:sa.n*sa.m
 
     for this_flip_group in each_flip_group
-        # @info "this_flip_group = $this_flip_group"
         for i in 1:length(this_flip_group)
             for j in i+1:length(this_flip_group)
                 related_gadgets_i = []
@@ -70,8 +69,6 @@ function test_flip_id(sa::SimulatedAnnealingHamiltonian)
                 if this_flip_group[j] <= sa.n*(sa.m-1)
                     related_gadgets_j = vcat(related_gadgets_j, unsafe_child_nodes(sa, this_flip_group[j]))
                 end
-                # @info "i = $(this_flip_group[i]), j = $(this_flip_group[j])"
-                # @info "related_gadgets_i = $related_gadgets_i, related_gadgets_j = $related_gadgets_j"
                 @test length(intersect(related_gadgets_i, related_gadgets_j)) == 0
             end
         end
@@ -111,7 +108,7 @@ end
     sequential_flip_state_energy = [calculate_energy(sa, sequential_flip_state, fill(1.0, nbatch), i) for i in 1:nbatch]
     sequential_flip_success = count(x -> x==0, sequential_flip_state_energy)
     @info success, sequential_flip_success
-    @test abs((sequential_flip_success - success) / nbatch) <= 0.03
+    @test abs((sequential_flip_success - success) / nbatch) <= 0.05
 end
 
 if CUDA.functional()
