@@ -12,3 +12,7 @@ end
 @testset "truthtablelp" begin
     include("truthtablelp.jl")
 end
+
+@testset "visualize" begin
+    include("visualize.jl")
+end

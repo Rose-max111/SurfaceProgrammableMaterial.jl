@@ -1,7 +1,6 @@
 module SurfaceProgrammableMaterial
 
 using BitBasis
-using CairoMakie
 using Random
 using JuMP
 using GenericTensorNetworks
@@ -11,9 +10,9 @@ using Suppressor
 
 
 # Export some abstract type used in code
-export TempcomputeRule, Gaussiantype, Exponentialtype
+export GaussianGradient, ExponentialGradient, TemperatureGradient
 export TransitionRule, HeatBath, Metropolis
-export SimulatedAnnealingHamiltonian
+export SimulatedAnnealingHamiltonian, energy
 
 # Basic gate
 export BasicGate
@@ -31,10 +30,13 @@ export track_equilibration_fixedlayer_cpu!, track_equilibration_fixedlayer_gpu!
 # Export truth_table_mapping in LP method
 export query_model, nspin, ground_state, IsingGadget
 
+export show_temperature_matrix
+
 include("superstruct.jl")
 include("basicgate.jl")
 include("ca1d.jl")
 include("simulated_annealing.jl")
 include("truthtablelp.jl")
+include("visualize.jl")
 
 end

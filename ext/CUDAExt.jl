@@ -1,13 +1,13 @@
 module CUDAExt
 
 using CUDA
-import SurfaceProgrammableMaterial: step_kernel!, get_parallel_flip_id, natom, SimulatedAnnealingHamiltonian, TransitionRule, TempcomputeRule
+import SurfaceProgrammableMaterial: unsafe_step_kernel!, get_parallel_flip_id, nspin, SimulatedAnnealingHamiltonian, TransitionRule, TemperatureGradient
 
 function step!(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian, state::CuMatrix, energy_gradient::AbstractArray, Temp, node=nothing)
     @inline function kernel(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian, state::AbstractMatrix, energy_gradient::AbstractArray, Temp, node=nothing)
         ibatch = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
         if ibatch <= size(state, 2)
-            step_kernel!(rule, sa, state, energy_gradient, Temp, ibatch, node)
+            unsafe_step_kernel!(rule, sa, state, energy_gradient, Temp, ibatch, node)
         end
         return nothing
     end
@@ -29,7 +29,7 @@ function step_parallel!(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian,
         for k in id:stride:Nx*Ny
             ibatch = cind[k][1]
             id = cind[k][2]
-            step_kernel!(rule, sa, state, energy_gradient, Temp, ibatch, flip_id[id])
+            unsafe_step_kernel!(rule, sa, state, energy_gradient, Temp, ibatch, flip_id[id])
         end
         return nothing
     end
@@ -50,7 +50,7 @@ function track_equilibration_collective_temperature_gpu!(rule::TransitionRule,
         singlebatch_temp = fill(Float32(temperature), sa.m-1)
         Temp = CuArray(fill(singlebatch_temp, size(state, 2)))
         if accelerate_flip == false
-            for thisatom in 1:natom(sa)
+            for thisatom in 1:nspin(sa)
                 step!(rule, sa, state, CuArray(fill(1.0f0, size(state, 2))), Temp, thisatom)
             end
         else
@@ -63,7 +63,7 @@ function track_equilibration_collective_temperature_gpu!(rule::TransitionRule,
 end
 
 function track_equilibration_pulse_reverse_gpu!(rule::TransitionRule,
-                                        temprule::TempcomputeRule,
+                                        temprule::TemperatureGradient,
                                         sa::SimulatedAnnealingHamiltonian, 
                                         state::AbstractMatrix, 
                                         pulse_gradient, 
@@ -80,7 +80,7 @@ function track_equilibration_pulse_reverse_gpu!(rule::TransitionRule,
         singlebatch_temp = toymodel_pulse(temprule, sa, pulse_amplitude, pulse_width, midposition, pulse_gradient)
         Temp = CuArray(fill(Float32.(singlebatch_temp), size(state, 2)))
         if accelerate_flip == false
-            for thisatom in 1:natom(sa)
+            for thisatom in 1:nspin(sa)
                 step!(rule, sa, state, CuArray(fill(1.0, size(state, 2))), Temp, thisatom)
             end
         else
@@ -106,11 +106,11 @@ function track_equilibration_fixedlayer_gpu!(rule::TransitionRule,
         Temp = CuArray((fill(singlebatch_temp, size(state, 2))))
         if accelerate_flip == false
             if fixedinput == false # this time fix output
-                for thisatom in 1:natom(sa)-sa.n
+                for thisatom in 1:nspin(sa)-sa.n
                     step!(rule, sa, state, CuArray(fill(1.0f0, size(state, 2))), Temp, thisatom)
                 end
             else # this time fix input
-                for thisatom in sa.n+1:natom(sa)
+                for thisatom in sa.n+1:nspin(sa)
                     step!(rule, sa, state, CuArray(fill(1.0f0, size(state, 2))), Temp, thisatom)
                 end
             end
@@ -127,7 +127,7 @@ function track_equilibration_fixedlayer_gpu!(rule::TransitionRule,
 end
 
 function track_equilibration_pulse_gpu!(rule::TransitionRule,
-                                        temprule::TempcomputeRule,
+                                        temprule::TemperatureGradient,
                                         sa::SimulatedAnnealingHamiltonian, 
                                         state::AbstractMatrix, 
                                         pulse_gradient, 
