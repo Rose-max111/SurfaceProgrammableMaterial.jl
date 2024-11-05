@@ -9,6 +9,7 @@ using Test, SurfaceProgrammableMaterial, CairoMakie
     tracker = SAStateTracker()
     state = random_state(sa, 10)
     annealing_time = 2000
-    track_equilibration_pulse!(HeatBath(), eg, sa, state, annealing_time; tracker)
-    animate_tracker(sa, tracker, 1; step=10)
+    r = SARuntime(Float64, sa, 10)
+    track_equilibration_pulse!(r, eg, annealing_time; tracker, reverse_direction=true)
+    @test animate_tracker(sa, tracker, 1; step=10) === nothing
 end

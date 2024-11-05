@@ -119,12 +119,12 @@ function parallel_scheme(sa::SimulatedAnnealingHamiltonian{<:CellularAutomata1D}
         push!(ret, temp)
     end
     if sa.n % 3 >= 1
-        push!(ret, Vector(sa.n:2*sa.n:sa.n*sa.m))
-        push!(ret, Vector(2*sa.n:2*sa.n:sa.n*sa.m))
+        push!(ret, collect(sa.n:2*sa.n:sa.n*sa.m))
+        push!(ret, collect(2*sa.n:2*sa.n:sa.n*sa.m))
     end
     if sa.n % 3 >= 2
-        push!(ret, Vector(sa.n-1:2*sa.n:sa.n*sa.m))
-        push!(ret, Vector(2*sa.n-1:2*sa.n:sa.n*sa.m))
+        push!(ret, collect(sa.n-1:2*sa.n:sa.n*sa.m))
+        push!(ret, collect(2*sa.n-1:2*sa.n:sa.n*sa.m))
     end
     return ret
 end
@@ -143,10 +143,11 @@ end
 # - temprule: the temperature gradient
 # - t: the current step index
 # - annealing_time: the total number of steps
-function update_temperature!(runtime::SARuntime, temprule::TemperatureGradient, t::Integer, annealing_time::Integer)
-    midposition = 1 - cutoff_distance(temprule)
-    each_movement = ((1.0 - midposition) * 2 + (runtime.hamiltonian.m - 2)) / (annealing_time - 1)
-    singlebatch_temp = temperature_matrix(temprule, runtime.hamiltonian, midposition + t * each_movement)
+function update_temperature!(runtime::SARuntime, temprule::TemperatureGradient, t::Integer, annealing_time::Integer, reverse_direction::Bool)
+    dcut = cutoff_distance(temprule)
+    sa = runtime.hamiltonian
+    each_movement = (dcut * 2 + sa.m) / (annealing_time - 1)
+    singlebatch_temp = temperature_matrix(temprule, sa, reverse_direction ? sa.m + dcut - t * each_movement : -dcut + t * each_movement)
     runtime.temperature .= repeat(vec(singlebatch_temp), 1, size(runtime.temperature, 2))
 end
 function temperature_matrix(tg::TemperatureGradient, sa::SimulatedAnnealingHamiltonian, middle_position::Real)
@@ -158,20 +159,17 @@ function track_equilibration_pulse!(
                 temprule::TemperatureGradient,
                 annealing_time;
                 tracker = nothing,
-                flip_scheme = 1:nspin(sa),
-                transition_rule::TransitionRule = HeatBath()
+                flip_scheme = 1:nspin(runtime.hamiltonian),
+                transition_rule::TransitionRule = HeatBath(),
+                reverse_direction::Bool=false
             )
     sa = runtime.hamiltonian
     @assert sort!(vcat(flip_scheme...)) == collect(1:nspin(sa)) "invalid flip scheme: $flip_scheme, must be a perfect cover of all spins: $(1:nspin(sa))"
-    midposition = 1 - cutoff_distance(temprule)
-    each_movement = ((1.0 - midposition) * 2 + (sa.m - 2)) / (annealing_time - 1)
-    @info "midposition = $midposition"
-    @info "each_movement = $each_movement"
 
-    update_temperature!(runtime, temprule, 0, annealing_time)
+    update_temperature!(runtime, temprule, 0, annealing_time, reverse_direction)
     tracker !== nothing && track!(tracker, copy(runtime.state), copy(runtime.temperature))
     for t in 1:annealing_time
-        update_temperature!(runtime, temprule, t, annealing_time)
+        update_temperature!(runtime, temprule, t, annealing_time, reverse_direction)
         for spins in flip_scheme
             step!(transition_rule, runtime, spins)
         end
