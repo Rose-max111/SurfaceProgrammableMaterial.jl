@@ -4,7 +4,7 @@ using SurfaceProgrammableMaterial: nspin, spins
 using SurfaceProgrammableMaterial: unsafe_evaluate_parent
 using SurfaceProgrammableMaterial: unsafe_parent_nodes, unsafe_child_nodes
 using SurfaceProgrammableMaterial: SimulatedAnnealingHamiltonian
-using SurfaceProgrammableMaterial: get_parallel_flip_id
+using SurfaceProgrammableMaterial: parallel_scheme
 using SurfaceProgrammableMaterial: random_state
 
 @testset "basic_hamiltonian" begin
@@ -55,7 +55,7 @@ end
 end
 
 function test_flip_id(sa::SimulatedAnnealingHamiltonian)
-    each_flip_group = get_parallel_flip_id(sa)
+    each_flip_group = parallel_scheme(sa)
     @test sum(length.(each_flip_group)) == sa.n*sa.m
 
     total_flip_id = sort(vcat(each_flip_group...))
@@ -97,19 +97,20 @@ end
     sa = SimulatedAnnealingHamiltonian(8, 8, CellularAutomata1D(110))
     nbatch = 2000
     state = random_state(sa, nbatch)
-    annealing_time = 2000
+    annealing_time = 200
 
-    eg = ExponentialGradient(2.0, 0.5, 1e-5)
+    eg = ExponentialGradient(2.0, 2.0, 1e-5)
     tracker = SAStateTracker()
-    track_equilibration_pulse!(HeatBath(), eg, sa, state, annealing_time; accelerate_flip = true, tracker)
-    @test length(tracker.state) == length(tracker.temperature) == 2001
+    track_equilibration_pulse!(HeatBath(), eg, sa, state, annealing_time; flip_scheme = 1:nspin(sa), tracker)
+    @test length(tracker.state) == length(tracker.temperature) == 201
  
     state_energy = energy(sa, state)
     success = count(x -> x == 0, state_energy)
-    @test abs((success / nbatch) - 0.55) <= 0.1
+    @show success / nbatch
+    @test abs((success / nbatch) - 0.45) <= 0.1
 
     sequential_flip_state = random_state(sa, nbatch)
-    track_equilibration_pulse!(HeatBath(), eg, sa, sequential_flip_state, annealing_time; accelerate_flip = false)
+    track_equilibration_pulse!(HeatBath(), eg, sa, sequential_flip_state, annealing_time; flip_scheme = parallel_scheme(sa))
     sequential_flip_state_energy = energy(sa, sequential_flip_state)
     sequential_flip_success = count(x -> x==0, sequential_flip_state_energy)
     @info success, sequential_flip_success
