@@ -125,4 +125,37 @@ function track_equilibration_fixedlayer_gpu!(rule::TransitionRule,
         end
     end
 end
+
+function track_equilibration_pulse_gpu!(rule::TransitionRule,
+                                        temprule::TempcomputeRule,
+                                        sa::SimulatedAnnealingHamiltonian, 
+                                        state::AbstractMatrix, 
+                                        pulse_gradient, 
+                                        pulse_amplitude,
+                                        pulse_width,
+                                        annealing_time; accelerate_flip = false
+                                        )    
+    midposition = midposition_calculate(temprule, pulse_amplitude, pulse_width, pulse_gradient)
+    each_movement = ((1.0 - midposition) * 2 + (sa.m - 2)) / (annealing_time - 1)
+    @info "each_movement = $each_movement"
+
+    for t in 1:annealing_time
+        singlebatch_temp = toymodel_pulse(temprule, sa, pulse_amplitude, pulse_width, midposition, pulse_gradient)
+        temperature = CuArray(fill(Float32.(singlebatch_temp), size(state, 2)))
+        if accelerate_flip == false
+            for thisatom in 1:nspin(sa)
+                step!(rule, sa, state, CuArray(fill(1.0, size(state, 2))), temperature, thisatom)
+            end
+        else
+            flip_list = get_parallel_flip_id(sa)
+            for eachflip in flip_list
+                step_parallel!(rule, sa, state, CuArray(fill(1.0, size(state, 2))), temperature, CuArray(eachflip))
+            end
+        end
+        midposition += each_movement
+    end
+    return sa
+end
+
+
 end

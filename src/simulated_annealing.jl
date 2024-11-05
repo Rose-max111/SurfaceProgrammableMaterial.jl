@@ -1,107 +1,123 @@
-struct SimulatedAnnealingHamiltonian
-    n::Int # number of atoms per layer
+struct SimulatedAnnealingHamiltonian{ET}
+    n::Int # number of spins per layer
     m::Int # number of full layers (count the last layer!)
+    energy_term::ET  # e.g. a cellular automaton rule, takes 3 inputs and returns 1 output
+    periodic::Bool  # whether to use periodic boundary condition
 end
+SimulatedAnnealingHamiltonian(n::Int, m::Int, energy_term) = SimulatedAnnealingHamiltonian(n, m, energy_term, true)
 
-natom(sa::SimulatedAnnealingHamiltonian) = sa.n * sa.m
-atoms(sa::SimulatedAnnealingHamiltonian) = Base.OneTo(natom(sa))
+nspin(sa::SimulatedAnnealingHamiltonian) = sa.n * sa.m
+spins(sa::SimulatedAnnealingHamiltonian) = Base.OneTo(nspin(sa))
 function random_state(sa::SimulatedAnnealingHamiltonian, nbatch::Integer)
-    return rand(Bool, natom(sa), nbatch)
-end
-hasparent(sa::SimulatedAnnealingHamiltonian, node::Integer) = node > sa.n
-
-# evaluate the energy of the i-th gadget (involving atoms i and its parents)
-function evaluate_parent(sa::SimulatedAnnealingHamiltonian, state::AbstractMatrix, energy_gradient::AbstractArray, inode::Integer, ibatch::Integer)
-    i, j = CartesianIndices((sa.n, sa.m))[inode].I
-    idp = parent_nodes(sa, inode)
-    trueoutput = @inbounds rule110(state[idp[1], ibatch], state[idp[2], ibatch], state[idp[3], ibatch])
-    # trueoutput = @inbounds rule150(state[idp[1], ibatch], state[idp[2], ibatch], state[idp[3], ibatch])
-    return @inbounds (trueoutput ⊻ state[inode, ibatch]) * (energy_gradient[ibatch] ^ (sa.m - j))
-end
-function calculate_energy(sa::SimulatedAnnealingHamiltonian, state::AbstractMatrix, energy_gradient::AbstractArray, ibatch::Integer)
-    return sum(i->evaluate_parent(sa, state, energy_gradient, i, ibatch), sa.n+1:natom(sa))
+    return rand(Bool, nspin(sa), nbatch)
 end
 
-function parent_nodes(sa::SimulatedAnnealingHamiltonian, node::Integer)
-    n = sa.n
-    i, j = CartesianIndices((n, sa.m))[node].I
-    lis = LinearIndices((n, sa.m))
-    @inbounds (
-        lis[mod1(i-1, n), j-1],  # periodic boundary condition
-        lis[i, j-1],
-        lis[mod1(i+1, n), j-1],
-    )
+# NOTE: MT and ST can be CuArray type.
+struct SARuntime{T, MT<:AbstractMatrix{T}, ST<:AbstractMatrix{Bool}, ET}    # runtime information for simulated annealing
+    hamiltonian::SimulatedAnnealingHamiltonian{ET}   # the Hamiltonian
+    energy_gradient::MT    # energy gradient
+    temperature::MT    # temperature, which has the same size as state
+    state::ST    # state
+    function SARuntime(hamiltonian::SimulatedAnnealingHamiltonian{ET}, energy_gradient::AbstractArray{T}, temperature::AbstractMatrix{T}, state::AbstractMatrix{Bool}) where ET
+        @assert size(energy_gradient) == size(temperature) == size(state) "energy_gradient, temperature and state must have the same size"
+        @assert nspin(hamiltonian) == size(state, 1) "state must have the same number of spins as the Hamiltonian"
+        new{T, typeof(energy_gradient), typeof(state), ET}(hamiltonian, energy_gradient, temperature, state)
+    end
+end
+nbatch(sr::SARuntime) = size(sr.state, 2)
+
+# initialize the runtime information with random state
+function SARuntime(sa::SimulatedAnnealingHamiltonian{ET}, nbatch::Integer) where ET
+    return SARuntime(sa, zeros(eltype(sa), nspin(sa), nbatch), zeros(eltype(sa), sa.m-1, nbatch), rand(Bool, nspin(sa), nbatch))
 end
 
-function child_nodes(sa::SimulatedAnnealingHamiltonian, node::Integer)
-    n = sa.n
-    i, j = CartesianIndices((n, sa.m))[node].I
-    lis = LinearIndices((n, sa.m))
-    @inbounds (
-        lis[mod1(i-1, n), j+1],  # periodic boundary condition
-        lis[mod1(i, n), j+1],
-        lis[mod1(i+1, n), j+1],
-    )
+# evaluate the energy of the i-th gadget (involving spins i and its parents)
+function calculate_energy(sa::SimulatedAnnealingHamiltonian, state::AbstractMatrix, ibatch::Integer)
+    return sum(i->unsafe_evaluate_parent(sa, state, i, ibatch), sa.n+1:nspin(sa))
+end
+@inline function unsafe_evaluate_parent(sa::SimulatedAnnealingHamiltonian, state::AbstractMatrix, inode::Integer, ibatch::Integer)
+    (a, b, c) = unsafe_parent_nodes(sa, inode)
+    @inbounds begin
+        i, j = CartesianIndices((sa.n, sa.m))[inode].I
+        trueoutput = sa.energy_term(state[a, ibatch], state[b, ibatch], state[c, ibatch])
+        return trueoutput ⊻ state[inode, ibatch]
+    end
 end
 
-function step!(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian, state::AbstractMatrix, energy_gradient::AbstractArray, Temp, node=nothing)
+# NOTE: this function does not perform boundary check
+@inline function unsafe_parent_nodes(sa::SimulatedAnnealingHamiltonian{<:CellularAutomata1D}, node::Integer)
+    grid = CartesianIndices((sa.n, sa.m))
+    lis = LinearIndices((sa.n, sa.m))
+    @inbounds i, j = grid[node].I
+    @inbounds sa.periodic ? (lis[mod1(i-1, sa.n), j-1], lis[i, j-1], lis[mod1(i+1, sa.n), j-1]) : (lis[i-1, j-1], lis[i, j-1], lis[i+1, j-1])
+end
+@inline function unsafe_child_nodes(sa::SimulatedAnnealingHamiltonian{<:CellularAutomata1D}, node::Integer)
+    grid = CartesianIndices((sa.n, sa.m))
+    lis = LinearIndices((sa.n, sa.m))
+    @inbounds i, j = grid[node].I
+    @inbounds sa.periodic ? (lis[mod1(i-1, sa.n), j+1], lis[mod1(i, sa.n), j+1], lis[mod1(i+1, sa.n), j+1]) : (lis[i-1, j+1], lis[i, j+1], lis[i+1, j+1])
+end
+
+# step on single node and all batches
+function step!(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian, state::AbstractMatrix, temperature, node=nothing)
+    @boundscheck size(temperature) == size(state) || throw(DimensionMismatch("temperature must have the same size as state"))
     for ibatch in 1:size(state, 2)
-        step_kernel!(rule, sa, state, energy_gradient, Temp, ibatch, node)
+        unsafe_step_kernel!(rule, sa, state, temperature, ibatch, node)
     end
     state
 end
 
-@inline function step_kernel!(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian, state, energy_gradient::AbstractArray, Temp, ibatch::Integer, node=nothing)
+@inline function unsafe_step_kernel!(rule::TransitionRule,
+        sa::SimulatedAnnealingHamiltonian,
+        state::AbstractMatrix,
+        temperature::AbstractMatrix,
+        ibatch::Integer,
+        node::Integer
+    )
     ΔE_with_next_layer = 0
     ΔE_with_previous_layer = 0
-    # node = rand(atoms(sa))
-    if node === nothing
-        node = rand(atoms(sa))
-    end
-    i, j = CartesianIndices((sa.n, sa.m))[node].I
-    if j > 1 # not the first layer
-        # ΔE += energy_gradient[ibatch]^(sa.m - j) - 2 * evaluate_parent(sa, state, energy_gradient, node, ibatch)
-        ΔE_with_previous_layer += energy_gradient[ibatch]^(sa.m - j) - 2 * evaluate_parent(sa, state, energy_gradient, node, ibatch)
-    end
-    if j < sa.m # not the last layer
-        cnodes = child_nodes(sa, node)
-        for node in cnodes
-            ΔE_with_next_layer -= evaluate_parent(sa, state, energy_gradient, node, ibatch)
+    grid = CartesianIndices((sa.n, sa.m))
+
+    @inbounds begin
+        i, j = grid[node].I
+        if j > 1 # not the first layer
+            ΔE_with_previous_layer += 1 - 2 * unsafe_evaluate_parent(sa, state, node, ibatch)
         end
-        # flip the node@
-        @inbounds state[node, ibatch] ⊻= true
-        for node in cnodes
-            ΔE_with_next_layer += evaluate_parent(sa, state, energy_gradient, node, ibatch)
+        if j < sa.m # not the last layer
+            cnodes = unsafe_child_nodes(sa, node)
+            for node in cnodes
+                ΔE_with_next_layer -= unsafe_evaluate_parent(sa, state, node, ibatch)
+            end
+            # flip the node@
+            state[node, ibatch] ⊻= true
+            for node in cnodes
+                ΔE_with_next_layer += unsafe_evaluate_parent(sa, state, node, ibatch)
+            end
+            state[node, ibatch] ⊻= true
         end
-        @inbounds state[node, ibatch] ⊻= true
-    end
-    flip_max_prob = 1
-    if j == sa.m
-        flip_max_prob *= prob_accept(rule, Temp[ibatch][j-1], ΔE_with_previous_layer)
-        # flip_max_prob = prob_accept(HeatBath(), Temp[ibatch][j-1], ΔE_with_previous_layer)
-    elseif j == 1
-        flip_max_prob *= prob_accept(rule, Temp[ibatch][j], ΔE_with_next_layer)
-        # flip_max_prob *= prob_accept(HeatBath(), Temp[ibatch][j], ΔE_with_next_layer)
-    else
-        flip_max_prob = 1.0 / (1.0 + exp(ΔE_with_previous_layer / Temp[ibatch][j-1] + ΔE_with_next_layer / Temp[ibatch][j]))
-    end
-    if rand() < flip_max_prob
-        @inbounds state[node, ibatch] ⊻= true
-        ΔE_with_next_layer
-    else
-        0
+        flip_max_prob = 1
+        if j == sa.m
+            flip_max_prob *= prob_accept(rule, temperature[ibatch][j-1], ΔE_with_previous_layer)
+        elseif j == 1
+            flip_max_prob *= prob_accept(rule, temperature[ibatch][j], ΔE_with_next_layer)
+        else
+            flip_max_prob = 1.0 / (1.0 + exp(ΔE_with_previous_layer / temperature[ibatch][j-1] + ΔE_with_next_layer / temperature[ibatch][j]))
+        end
+        if rand() < flip_max_prob
+            state[node, ibatch] ⊻= true
+            ΔE_with_next_layer
+        else
+            0
+        end
     end
 end
-# prob_accept(::Metropolis, Temp, ΔE::T) where T<:Real = ΔE < 0 ? 1.0 : exp(- (ΔE) / Temp)
-prob_accept(::HeatBath, Temp, ΔE::Real) = inv(1 + exp(ΔE / Temp))
+prob_accept(::HeatBath, temperature, ΔE::Real) = inv(1 + exp(ΔE / temperature))
 
-
-
-function step_parallel!(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian, state::AbstractMatrix, energy_gradient::AbstractArray, Temp, flip_id)
+function step_parallel!(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian, state::AbstractMatrix, temperature, flip_id)
     # @info "flip_id = $flip_id"
     for ibatch in 1:size(state, 2)
         for this_time_flip in flip_id
-            step_kernel!(rule, sa, state, energy_gradient, Temp, ibatch, this_time_flip)
+            unsafe_step_kernel!(rule, sa, state, temperature, ibatch, this_time_flip)
         end
     end
     state
@@ -114,7 +130,7 @@ function toymodel_pulse(rule::TempcomputeRule, sa::SimulatedAnnealingHamiltonian
                             gradient::Float64)
     # amplitude * e^(- (1 /width) * (x-middle_position)^2)
     # eachposition = Tuple([pulse_amplitude * gradient^(- (1.0/pulse_width) * abs(i-middle_position)) + 1e-5 for i in 1:sa.m-1])
-    eachposition = Tuple([temp_calculate(rule, pulse_amplitude, pulse_width, middle_position, gradient, i) for i in 1:sa.m-1])
+    eachposition = [temp_calculate(rule, pulse_amplitude, pulse_width, middle_position, gradient, i) for i in 1:sa.m-1]
     return eachposition 
 end
 temp_calculate(::Gaussiantype, pulse_amplitude::Float64,
@@ -175,50 +191,20 @@ function track_equilibration_pulse_cpu!(rule::TransitionRule,
 
     for t in 1:annealing_time
         singlebatch_temp = toymodel_pulse(temprule, sa, pulse_amplitude, pulse_width, midposition, pulse_gradient)
-        Temp = fill((singlebatch_temp), size(state, 2))
+        temperature = repeat(singlebatch_temp, 1, size(state, 2))
+        energy_gradient = fill(1.0, size(state, 2))
         if accelerate_flip == false
-            for thisatom in 1:natom(sa)
-                step!(rule, sa, state, fill(1.0, size(state, 2)), Temp, thisatom)
+            for thisatom in 1:nspin(sa)
+                step!(rule, sa, state, energy_gradient, temperature, thisatom)
             end
         else
             flip_list = get_parallel_flip_id(sa)
             for eachflip in flip_list
-                step_parallel!(rule, sa, state, fill(1.0, size(state, 2)), Temp, eachflip)
+                step_parallel!(rule, sa, state, energy_gradient, temperature, eachflip)
             end
         end
         midposition += each_movement
     end
-end
-
-function track_equilibration_pulse_gpu!(rule::TransitionRule,
-                                        temprule::TempcomputeRule,
-                                        sa::SimulatedAnnealingHamiltonian, 
-                                        state::AbstractMatrix, 
-                                        pulse_gradient, 
-                                        pulse_amplitude,
-                                        pulse_width,
-                                        annealing_time; accelerate_flip = false
-                                        )    
-    midposition = midposition_calculate(temprule, pulse_amplitude, pulse_width, pulse_gradient)
-    each_movement = ((1.0 - midposition) * 2 + (sa.m - 2)) / (annealing_time - 1)
-    @info "each_movement = $each_movement"
-
-    for t in 1:annealing_time
-        singlebatch_temp = toymodel_pulse(temprule, sa, pulse_amplitude, pulse_width, midposition, pulse_gradient)
-        Temp = CuArray(fill(Float32.(singlebatch_temp), size(state, 2)))
-        if accelerate_flip == false
-            for thisatom in 1:natom(sa)
-                step!(rule, sa, state, CuArray(fill(1.0, size(state, 2))), Temp, thisatom)
-            end
-        else
-            flip_list = get_parallel_flip_id(sa)
-            for eachflip in flip_list
-                step_parallel!(rule, sa, state, CuArray(fill(1.0, size(state, 2))), Temp, CuArray(eachflip))
-            end
-        end
-        midposition += each_movement
-    end
-    return sa
 end
 
 function track_equilibration_collective_temperature_cpu!(rule::TransitionRule,
@@ -228,15 +214,16 @@ function track_equilibration_collective_temperature_cpu!(rule::TransitionRule,
                                         annealing_time; accelerate_flip = false)
     for t in 1:annealing_time
         singlebatch_temp = fill(temperature, sa.m-1)
-        Temp = fill(singlebatch_temp, size(state, 2))
+        temperature = repeat(singlebatch_temp, 1, size(state, 2))
+        energy_gradient = fill(1.0, size(state, 2))
         if accelerate_flip == false
-            for thisatom in 1:natom(sa)
-                step!(rule, sa, state, fill(1.0, size(state, 2)), Temp, thisatom)
+            for thisatom in 1:nspin(sa)
+                step!(rule, sa, state, energy_gradient, temperature, thisatom)
             end
         else
             flip_list = get_parallel_flip_id(sa)
             for eachflip in flip_list
-                step_parallel!(rule, sa, state, fill(1.0, size(state, 2)), Temp, eachflip)
+                step_parallel!(rule, sa, state, energy_gradient, temperature, eachflip)
             end
         end
     end
@@ -260,15 +247,15 @@ function track_equilibration_pulse_reverse_cpu!(rule::TransitionRule,
     for t in 1:annealing_time
         @info "midposition = $midposition"
         singlebatch_temp = toymodel_pulse(temprule, sa, pulse_amplitude, pulse_width, midposition, pulse_gradient)
-        Temp = fill(singlebatch_temp, size(state, 2))
+        temperature = repeat(singlebatch_temp, 1, size(state, 2))
         if accelerate_flip == false
-            for thisatom in 1:natom(sa)
-                step!(rule, sa, state, fill(1.0, size(state, 2)), Temp, thisatom)
+            for thisatom in 1:nspin(sa)
+                step!(rule, sa, state, temperature, thisatom)
             end
         else
             flip_list = get_parallel_flip_id(sa)
             for eachflip in flip_list
-                step_parallel!(rule, sa, state, fill(1.0, size(state, 2)), Temp, eachflip)
+                step_parallel!(rule, sa, state, energy_gradient, temperature, eachflip)
             end
         end
         midposition -= each_movement
@@ -284,15 +271,16 @@ function track_equilibration_fixedlayer_cpu!(rule::TransitionRule,
     Temp_list = reverse(range(1e-5, 10.0, annealing_time))
     for this_temp in Temp_list
         singlebatch_temp = fill(this_temp, sa.m-1)
-        Temp = fill(singlebatch_temp, size(state, 2))
+        temperature = repeat(singlebatch_temp, 1, size(state, 2))
+        energy_gradient = fill(1.0, size(state, 2))
         if accelerate_flip == false
             if fixedinput == false # this time fix output
-                for thisatom in 1:natom(sa)-sa.n
-                    step!(rule, sa, state, fill(1.0, size(state, 2)), Temp, thisatom)
+                for thisatom in 1:nspin(sa)-sa.n
+                    step!(rule, sa, state, energy_gradient, temperature, thisatom)
                 end
             else # this time fix input
-                for thisatom in sa.n+1:natom(sa)
-                    step!(rule, sa, state, fill(1.0, size(state, 2)), Temp, thisatom)
+                for thisatom in sa.n+1:nspin(sa)
+                    step!(rule, sa, state, energy_gradient, temperature, thisatom)
                 end
             end
         else
@@ -301,7 +289,7 @@ function track_equilibration_fixedlayer_cpu!(rule::TransitionRule,
                 flip_list = [[x + sa.n for x in inner_vec] for inner_vec in flip_list]
             end
             for eachflip in flip_list
-                step_parallel!(rule, sa, state, fill(1.0, size(state, 2)), Temp, eachflip)
+                step_parallel!(rule, sa, state, energy_gradient, temperature, eachflip)
             end
         end
     end
