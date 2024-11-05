@@ -1,7 +1,7 @@
 module CUDAExt
 
 using CUDA
-import SurfaceProgrammableMaterial: unsafe_step_kernel!, get_parallel_flip_id, nspin, SimulatedAnnealingHamiltonian, TransitionRule, TemperatureGradient
+import SurfaceProgrammableMaterial: unsafe_step_kernel!, parallel_scheme, nspin, SimulatedAnnealingHamiltonian, TransitionRule, TemperatureGradient
 
 function step!(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian, state::CuMatrix, energy_gradient::AbstractArray, Temp, node=nothing)
     @inline function kernel(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian, state::AbstractMatrix, energy_gradient::AbstractArray, Temp, node=nothing)
@@ -54,7 +54,7 @@ function track_equilibration_collective_temperature!(rule::TransitionRule,
                 step!(rule, sa, state, CuArray(fill(1.0f0, size(state, 2))), Temp, thisatom)
             end
         else
-            flip_list = get_parallel_flip_id(sa)
+            flip_list = parallel_scheme(sa)
             for eachflip in flip_list
                 step_parallel!(rule, sa, state, CuArray(fill(1.0f0, size(state, 2))), Temp, CuArray(eachflip))
             end
@@ -84,7 +84,7 @@ function track_equilibration_pulse_reverse!(rule::TransitionRule,
                 step!(rule, sa, state, CuArray(fill(1.0, size(state, 2))), Temp, thisatom)
             end
         else
-            flip_list = get_parallel_flip_id(sa)
+            flip_list = parallel_scheme(sa)
             for eachflip in flip_list
                 step_parallel!(rule, sa, state, CuArray(fill(1.0, size(state, 2))), Temp, CuArray(eachflip))
             end
@@ -115,7 +115,7 @@ function track_equilibration_fixedlayer!(rule::TransitionRule,
                 end
             end
         else
-            flip_list = get_parallel_flip_id(SimulatedAnnealingHamiltonian(sa.n, sa.m-1)) # original fix output
+            flip_list = parallel_scheme(SimulatedAnnealingHamiltonian(sa.n, sa.m-1)) # original fix output
             if fixedinput == true # this time fix input
                 flip_list = [[x + sa.n for x in inner_vec] for inner_vec in flip_list]
             end
@@ -147,7 +147,7 @@ function track_equilibration_pulse!(rule::TransitionRule,
                 step!(rule, sa, state, CuArray(fill(1.0, size(state, 2))), temperature, thisatom)
             end
         else
-            flip_list = get_parallel_flip_id(sa)
+            flip_list = parallel_scheme(sa)
             for eachflip in flip_list
                 step_parallel!(rule, sa, state, CuArray(fill(1.0, size(state, 2))), temperature, CuArray(eachflip))
             end

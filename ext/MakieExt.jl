@@ -2,44 +2,12 @@ module MakieExt
 using CairoMakie, SurfaceProgrammableMaterial
 
 function SurfaceProgrammableMaterial.show_temperature_matrix(tg::TemperatureGradient, sa::SimulatedAnnealingHamiltonian, middle_position::Real)
-    tm = SurfaceProgrammableMaterial.temperature_matrix(tg, sa, middle_position)
+    tm = zeros(sa.n, sa.m)
+    SurfaceProgrammableMaterial.temperature_matrix!(tm, tg, sa, middle_position)
     f = Figure(size = (600, sa.n/sa.m*600))
     ax = Axis(f[1, 1], aspect = sa.m/sa.n, xlabel = "time", ylabel = "space")
     image!(ax, tm')
     return f
-end
-
-function renorm(vec)
-    return vec ./ sqrt(sum(vec.^2))
-end
-
-function init_data(n, m)
-    Tstep=1000 / 1e-2 + 1
-    repoint = Vector{Vector{Vector{Float64}}}()
-    refield = Vector{Vector{Vector{Float64}}}()
-    open("rk.txt","r") do io
-        for T in 1:Tstep
-            this_step = Vector{Vector{Float64}}()
-            for i in 1:(n*m+n*(m-1))
-                push!(this_step, [parse(Float64, x) for x in split(readline(io))])
-            end
-            push!(this_step, [0.0, 0.0, 0.1])
-            push!(repoint, this_step)
-        end
-        for T in 1:Tstep
-            this_step = Vector{Vector{Float64}}()
-            for i in 1:(n*m+n*(m-1))
-                push!(this_step, [parse(Float64, x) for x in split(readline(io))])
-                # this_step[end] = renorm(this_step[end])
-            end
-            if T == 1
-                @info this_step
-            end
-            push!(this_step, [0.0, 0.0, 0.0])
-            push!(refield, this_step)
-        end
-    end
-    return repoint, refield
 end
 
 function energy_mesh(sa::SimulatedAnnealingHamiltonian, state::AbstractMatrix, ibatch::Int)
