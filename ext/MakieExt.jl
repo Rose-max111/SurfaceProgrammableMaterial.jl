@@ -13,7 +13,7 @@ end
 function energy_mesh(sa::SimulatedAnnealingHamiltonian, state::AbstractMatrix, ibatch::Int)
     return reshape([i<=sa.n ? 0.0 : SurfaceProgrammableMaterial.unsafe_energy(sa, state, i, ibatch) for i in 1:nspin(sa)], sa.n, sa.m)
 end
-function SurfaceProgrammableMaterial.animate_tracker(sa::SimulatedAnnealingHamiltonian, tracker::SAStateTracker, ibatch::Int; filename::String=tempname()*".mp4", framerate::Int=50, step::Int=1)
+function SurfaceProgrammableMaterial.animate_tracker(sa::SimulatedAnnealingHamiltonian, tracker::SAStateTracker, ibatch::Int; filename::String=tempname()*".mp4", framerate::Int=24, step::Int=1)
     @assert length(tracker.state) == length(tracker.temperature) > 0
     emesh = Observable(energy_mesh(sa, tracker.state[1], ibatch)')
     temperature = Observable(reshape(tracker.temperature[1][:, ibatch], sa.n, sa.m)')
