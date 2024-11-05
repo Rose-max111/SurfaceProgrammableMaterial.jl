@@ -20,6 +20,8 @@ CUDAExt = "CUDA"
 MakieExt = "CairoMakie"
 
 [compat]
+BitBasis = "0.9"
+COPT = "1"
 julia = "1"
 
 [extras]
