@@ -1,13 +1,13 @@
 module CUDAExt
 
 using CUDA
-import SurfaceProgrammableMaterial: step_kernel!, get_parallel_flip_id, natom, SimulatedAnnealingHamiltonian, TransitionRule, TempcomputeRule
+import SurfaceProgrammableMaterial: unsafe_step_kernel!, parallel_scheme, nspin, SimulatedAnnealingHamiltonian, TransitionRule, TemperatureGradient
 
 function step!(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian, state::CuMatrix, energy_gradient::AbstractArray, Temp, node=nothing)
     @inline function kernel(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian, state::AbstractMatrix, energy_gradient::AbstractArray, Temp, node=nothing)
         ibatch = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
         if ibatch <= size(state, 2)
-            step_kernel!(rule, sa, state, energy_gradient, Temp, ibatch, node)
+            unsafe_step_kernel!(rule, sa, state, energy_gradient, Temp, ibatch, node)
         end
         return nothing
     end
@@ -29,7 +29,7 @@ function step_parallel!(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian,
         for k in id:stride:Nx*Ny
             ibatch = cind[k][1]
             id = cind[k][2]
-            step_kernel!(rule, sa, state, energy_gradient, Temp, ibatch, flip_id[id])
+            unsafe_step_kernel!(rule, sa, state, energy_gradient, Temp, ibatch, flip_id[id])
         end
         return nothing
     end
@@ -41,20 +41,20 @@ function step_parallel!(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian,
     state
 end
 
-function track_equilibration_collective_temperature_gpu!(rule::TransitionRule,
+function track_equilibration_collective_temperature!(rule::TransitionRule,
                                         sa::SimulatedAnnealingHamiltonian, 
-                                        state::AbstractMatrix,
+                                        state::CuMatrix,
                                         temperature,
                                         annealing_time; accelerate_flip = false)
     for t in 1:annealing_time
         singlebatch_temp = fill(Float32(temperature), sa.m-1)
         Temp = CuArray(fill(singlebatch_temp, size(state, 2)))
         if accelerate_flip == false
-            for thisatom in 1:natom(sa)
+            for thisatom in 1:nspin(sa)
                 step!(rule, sa, state, CuArray(fill(1.0f0, size(state, 2))), Temp, thisatom)
             end
         else
-            flip_list = get_parallel_flip_id(sa)
+            flip_list = parallel_scheme(sa)
             for eachflip in flip_list
                 step_parallel!(rule, sa, state, CuArray(fill(1.0f0, size(state, 2))), Temp, CuArray(eachflip))
             end
@@ -62,10 +62,10 @@ function track_equilibration_collective_temperature_gpu!(rule::TransitionRule,
     end
 end
 
-function track_equilibration_pulse_reverse_gpu!(rule::TransitionRule,
-                                        temprule::TempcomputeRule,
+function track_equilibration_pulse_reverse!(rule::TransitionRule,
+                                        temprule::TemperatureGradient,
                                         sa::SimulatedAnnealingHamiltonian, 
-                                        state::AbstractMatrix, 
+                                        state::CuMatrix, 
                                         pulse_gradient, 
                                         pulse_amplitude,
                                         pulse_width,
@@ -80,11 +80,11 @@ function track_equilibration_pulse_reverse_gpu!(rule::TransitionRule,
         singlebatch_temp = toymodel_pulse(temprule, sa, pulse_amplitude, pulse_width, midposition, pulse_gradient)
         Temp = CuArray(fill(Float32.(singlebatch_temp), size(state, 2)))
         if accelerate_flip == false
-            for thisatom in 1:natom(sa)
+            for thisatom in 1:nspin(sa)
                 step!(rule, sa, state, CuArray(fill(1.0, size(state, 2))), Temp, thisatom)
             end
         else
-            flip_list = get_parallel_flip_id(sa)
+            flip_list = parallel_scheme(sa)
             for eachflip in flip_list
                 step_parallel!(rule, sa, state, CuArray(fill(1.0, size(state, 2))), Temp, CuArray(eachflip))
             end
@@ -94,9 +94,9 @@ function track_equilibration_pulse_reverse_gpu!(rule::TransitionRule,
     return sa
 end
 
-function track_equilibration_fixedlayer_gpu!(rule::TransitionRule,
+function track_equilibration_fixedlayer!(rule::TransitionRule,
                                         sa::SimulatedAnnealingHamiltonian, 
-                                        state::AbstractMatrix,  
+                                        state::CuMatrix,  
                                         annealing_time; accelerate_flip = false, fixedinput = false)
     Temp_list = reverse(range(1e-5, 10.0, annealing_time))
     for this_temp in Temp_list
@@ -106,16 +106,16 @@ function track_equilibration_fixedlayer_gpu!(rule::TransitionRule,
         Temp = CuArray((fill(singlebatch_temp, size(state, 2))))
         if accelerate_flip == false
             if fixedinput == false # this time fix output
-                for thisatom in 1:natom(sa)-sa.n
+                for thisatom in 1:nspin(sa)-sa.n
                     step!(rule, sa, state, CuArray(fill(1.0f0, size(state, 2))), Temp, thisatom)
                 end
             else # this time fix input
-                for thisatom in sa.n+1:natom(sa)
+                for thisatom in sa.n+1:nspin(sa)
                     step!(rule, sa, state, CuArray(fill(1.0f0, size(state, 2))), Temp, thisatom)
                 end
             end
         else
-            flip_list = get_parallel_flip_id(SimulatedAnnealingHamiltonian(sa.n, sa.m-1)) # original fix output
+            flip_list = parallel_scheme(SimulatedAnnealingHamiltonian(sa.n, sa.m-1)) # original fix output
             if fixedinput == true # this time fix input
                 flip_list = [[x + sa.n for x in inner_vec] for inner_vec in flip_list]
             end
@@ -125,4 +125,37 @@ function track_equilibration_fixedlayer_gpu!(rule::TransitionRule,
         end
     end
 end
+
+function track_equilibration_pulse!(rule::TransitionRule,
+                                        temprule::TemperatureGradient,
+                                        sa::SimulatedAnnealingHamiltonian, 
+                                        state::CuMatrix, 
+                                        pulse_gradient, 
+                                        pulse_amplitude,
+                                        pulse_width,
+                                        annealing_time; accelerate_flip = false
+                                        )    
+    midposition = midposition_calculate(temprule, pulse_amplitude, pulse_width, pulse_gradient)
+    each_movement = ((1.0 - midposition) * 2 + (sa.m - 2)) / (annealing_time - 1)
+    @info "each_movement = $each_movement"
+
+    for t in 1:annealing_time
+        singlebatch_temp = toymodel_pulse(temprule, sa, pulse_amplitude, pulse_width, midposition, pulse_gradient)
+        temperature = CuArray(fill(Float32.(singlebatch_temp), size(state, 2)))
+        if accelerate_flip == false
+            for thisatom in 1:nspin(sa)
+                step!(rule, sa, state, CuArray(fill(1.0, size(state, 2))), temperature, thisatom)
+            end
+        else
+            flip_list = parallel_scheme(sa)
+            for eachflip in flip_list
+                step_parallel!(rule, sa, state, CuArray(fill(1.0, size(state, 2))), temperature, CuArray(eachflip))
+            end
+        end
+        midposition += each_movement
+    end
+    return sa
+end
+
+
 end

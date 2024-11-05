@@ -5,10 +5,14 @@ using Test
     include("ca1d.jl")
 end
 
-@testset "cusa" begin
-    include("cusa.jl")
+@testset "simulated annealing" begin
+    include("simulated_annealing.jl")
 end
 
 @testset "truthtablelp" begin
     include("truthtablelp.jl")
+end
+
+@testset "visualize" begin
+    include("visualize.jl")
 end
