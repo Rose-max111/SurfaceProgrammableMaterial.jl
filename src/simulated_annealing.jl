@@ -100,13 +100,6 @@ end
     @inbounds sa.periodic ? (lis[mod1(i-1, sa.n), j+1], lis[mod1(i, sa.n), j+1], lis[mod1(i+1, sa.n), j+1]) : (lis[i-1, j+1], lis[i, j+1], lis[i+1, j+1])
 end
 
-# step on a subset of nodes and all batches
-function step!(transition_rule::TransitionRule, runtime::SARuntime, nodes)
-    for ibatch in 1:size(runtime.state, 2), node in nodes
-        unsafe_step_kernel!(transition_rule, runtime, ibatch, node)
-    end
-end
-
 function parallel_scheme(sa::SimulatedAnnealingHamiltonian{<:CellularAutomata1D})
     ret = Vector{Vector{Int}}()
     for cnt in 1:6
@@ -143,17 +136,23 @@ end
 # - temprule: the temperature gradient
 # - t: the current step index
 # - annealing_time: the total number of steps
-function update_temperature!(runtime::SARuntime, temprule::TemperatureGradient, t::Integer, annealing_time::Integer, reverse_direction::Bool)
+function update_temperature!(runtime::SARuntime, temprule::ColumnWiseGradient, t::Integer, annealing_time::Integer, reverse_direction::Bool)
     dcut = cutoff_distance(temprule)
     sa = runtime.hamiltonian
     each_movement = (dcut * 2 + sa.m) / (annealing_time - 1)
-    singlebatch_temp = temperature_matrix(temprule, sa, reverse_direction ? sa.m + dcut - t * each_movement : -dcut + t * each_movement)
-    for ibatch in 1:size(runtime.temperature, 2)
-        runtime.temperature[:, ibatch] .= vec(singlebatch_temp)
+    middle_position = reverse_direction ? sa.m + dcut - t * each_movement : -dcut + t * each_movement
+    temperature_matrix!(reshape(view(runtime.temperature, :, 1), sa.n, sa.m), temprule, sa, middle_position)
+    for ibatch in 1:size(runtime.temperature, 2), spin in 1:nspin(sa)
+        runtime.temperature[spin, ibatch] = runtime.temperature[spin, 1]
     end
 end
-function temperature_matrix(tg::TemperatureGradient, sa::SimulatedAnnealingHamiltonian, middle_position::Real)
-    return [evaluate_temperature(tg, middle_position - j) for i in 1:sa.n, j in 1:sa.m]
+function temperature_matrix!(output::AbstractMatrix, tg::ColumnWiseGradient, sa::SimulatedAnnealingHamiltonian, middle_position::Real)
+    for j in 1:sa.m
+        t = evaluate_temperature(tg, middle_position - j)
+        for i in 1:sa.n
+            output[i, j] = t
+        end
+    end
 end
 
 function track_equilibration_pulse!(
@@ -173,7 +172,10 @@ function track_equilibration_pulse!(
     for t in 1:annealing_time
         update_temperature!(runtime, temprule, t, annealing_time, reverse_direction)
         for spins in flip_scheme
-            step!(transition_rule, runtime, spins)
+            # step on a subset of nodes and all batches
+            for ibatch in 1:size(runtime.state, 2), spin in spins
+                unsafe_step_kernel!(transition_rule, runtime, ibatch, spin)
+            end
         end
         tracker !== nothing && track!(tracker, copy(runtime.state), copy(runtime.temperature))
     end

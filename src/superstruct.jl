@@ -1,7 +1,8 @@
 abstract type TemperatureGradient end
+abstract type ColumnWiseGradient <: TemperatureGradient end
 
 # Gaussian temperature gradient: T(distance) = amplitude * exp(-(distance)^2 / width^2) + lowest_temperature
-struct GaussianGradient <: TemperatureGradient
+struct GaussianGradient <: ColumnWiseGradient
     amplitude::Float64
     width::Float64
     lowest_temperature::Float64
@@ -12,7 +13,7 @@ end
 cutoff_distance(gg::GaussianGradient) = sqrt(-gg.width * log(1e-5/gg.amplitude))
 
 # Exponential temperature gradient: T(distance) = amplitude * exp(-abs(distance) / width) + lowest_temperature
-struct ExponentialGradient <: TemperatureGradient
+struct ExponentialGradient <: ColumnWiseGradient
     amplitude::Float64
     width::Float64
     lowest_temperature::Float64
