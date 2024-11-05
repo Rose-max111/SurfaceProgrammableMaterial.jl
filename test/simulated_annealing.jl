@@ -42,7 +42,7 @@ end
 end
 
 @testset "parent_nodes_child_nodes" begin
-    sa = SimulatedAnnealingHamiltonian(5, 4, CellularAutomata1D(110))
+    sa = SimulatedAnnealingHamiltonian(5, 5, CellularAutomata1D(110))
     @test unsafe_parent_nodes(sa, 21) == (20, 16, 17)
     @test unsafe_parent_nodes(sa, 6) == (5, 1, 2)
     @test unsafe_parent_nodes(sa, 7) == (1, 2, 3)
