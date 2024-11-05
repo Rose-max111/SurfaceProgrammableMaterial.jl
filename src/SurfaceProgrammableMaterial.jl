@@ -6,11 +6,9 @@ using JuMP
 using GenericTensorNetworks
 using COPT
 using HiGHS
-using Suppressor
-
 
 # Export some abstract type used in code
-export GaussianGradient, ExponentialGradient, TemperatureGradient
+export GaussianGradient, ExponentialGradient, ColumnWiseGradient, TemperatureGradient
 export TransitionRule, HeatBath, Metropolis
 export SimulatedAnnealingHamiltonian, energy, random_state
 
