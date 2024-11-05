@@ -25,4 +25,7 @@ cutoff_distance(eg::ExponentialGradient) = -eg.width * log(1e-5/eg.amplitude)
 
 abstract type TransitionRule end
 struct HeatBath <: TransitionRule end
+prob_accept(::HeatBath, ΔE_over_T::Real) = inv(1 + exp(ΔE_over_T))
+
 struct Metropolis <: TransitionRule end
+prob_accept(::Metropolis, ΔE_over_T::Real) = min(1, exp(-ΔE_over_T))

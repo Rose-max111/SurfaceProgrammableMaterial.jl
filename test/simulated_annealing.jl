@@ -1,7 +1,7 @@
 using Test, CUDA
 using SurfaceProgrammableMaterial
 using SurfaceProgrammableMaterial: nspin, spins
-using SurfaceProgrammableMaterial: unsafe_evaluate_parent
+using SurfaceProgrammableMaterial: unsafe_energy_temperature
 using SurfaceProgrammableMaterial: unsafe_parent_nodes, unsafe_child_nodes
 using SurfaceProgrammableMaterial: SimulatedAnnealingHamiltonian
 using SurfaceProgrammableMaterial: parallel_scheme
@@ -29,14 +29,15 @@ end
     # 0110
     # 1011
     sa = SimulatedAnnealingHamiltonian(4, 4, CellularAutomata1D(110))
-    state = reshape([1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 1], 16, 1)
+    state = reshape(Bool[1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 1], 16, 1)
     ibatch = 1
     @test length(state) == nspin(sa)
-    @test unsafe_evaluate_parent(sa, state, 5, ibatch) == 1
-    @test unsafe_evaluate_parent(sa, state, 6, ibatch) == 0
-    @test unsafe_evaluate_parent(sa, state, 7, ibatch) == 0
-    @test unsafe_evaluate_parent(sa, state, 8, ibatch) == 0
-    @test unsafe_evaluate_parent(sa, state, 10, ibatch) == 0
+    runtime = SARuntime(sa, state, ones(Float64, size(state)))
+    @test unsafe_energy_temperature(runtime, 5, ibatch)[1] == 1
+    @test unsafe_energy_temperature(runtime, 6, ibatch)[1] == 0
+    @test unsafe_energy_temperature(runtime, 7, ibatch)[1] == 0
+    @test unsafe_energy_temperature(runtime, 8, ibatch)[1] == 0
+    @test unsafe_energy_temperature(runtime, 10, ibatch)[1] == 0
     @test energy(sa, state)[ibatch] == 3
 end
 
@@ -96,24 +97,24 @@ end
 @testset "pulse_equilibration_cpu" begin
     sa = SimulatedAnnealingHamiltonian(8, 8, CellularAutomata1D(110))
     nbatch = 2000
-    state = random_state(sa, nbatch)
     annealing_time = 200
 
     eg = ExponentialGradient(2.0, 2.0, 1e-5)
     tracker = SAStateTracker()
-    track_equilibration_pulse!(HeatBath(), eg, sa, state, annealing_time; flip_scheme = 1:nspin(sa), tracker)
+    r = SARuntime(Float64, sa, nbatch)
+    track_equilibration_pulse!(r, eg, annealing_time; flip_scheme = 1:nspin(sa), tracker)
     @test length(tracker.state) == length(tracker.temperature) == 201
  
-    state_energy = energy(sa, state)
+    state_energy = energy(sa, r.state)
     success = count(x -> x == 0, state_energy)
     @show success / nbatch
     @test abs((success / nbatch) - 0.45) <= 0.1
 
-    sequential_flip_state = random_state(sa, nbatch)
-    track_equilibration_pulse!(HeatBath(), eg, sa, sequential_flip_state, annealing_time; flip_scheme = parallel_scheme(sa))
-    sequential_flip_state_energy = energy(sa, sequential_flip_state)
+    r = SARuntime(Float64, sa, nbatch)
+    track_equilibration_pulse!(r, eg, annealing_time; flip_scheme = parallel_scheme(sa))
+    sequential_flip_state_energy = energy(sa, r.state)
     sequential_flip_success = count(x -> x==0, sequential_flip_state_energy)
-    @info success, sequential_flip_success
+    @show success, sequential_flip_success
     @test abs((sequential_flip_success - success) / nbatch) <= 0.05
 end
 

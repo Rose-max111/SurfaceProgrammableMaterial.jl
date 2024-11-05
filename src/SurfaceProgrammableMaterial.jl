@@ -22,7 +22,7 @@ export CellularAutomata1D
 export automatarule
 
 # Export track_equilibration method
-export track_equilibration_pulse!, track_equilibration_pulse_reverse!, SAStateTracker
+export track_equilibration_pulse!, track_equilibration_pulse_reverse!, SAStateTracker, SARuntime
 export track_equilibration_collective_temperature!, track_equilibration_fixedlayer!
 
 # Export truth_table_mapping in LP method
