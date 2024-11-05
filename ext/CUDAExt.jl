@@ -41,9 +41,9 @@ function step_parallel!(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian,
     state
 end
 
-function track_equilibration_collective_temperature_gpu!(rule::TransitionRule,
+function track_equilibration_collective_temperature!(rule::TransitionRule,
                                         sa::SimulatedAnnealingHamiltonian, 
-                                        state::AbstractMatrix,
+                                        state::CuMatrix,
                                         temperature,
                                         annealing_time; accelerate_flip = false)
     for t in 1:annealing_time
@@ -62,10 +62,10 @@ function track_equilibration_collective_temperature_gpu!(rule::TransitionRule,
     end
 end
 
-function track_equilibration_pulse_reverse_gpu!(rule::TransitionRule,
+function track_equilibration_pulse_reverse!(rule::TransitionRule,
                                         temprule::TemperatureGradient,
                                         sa::SimulatedAnnealingHamiltonian, 
-                                        state::AbstractMatrix, 
+                                        state::CuMatrix, 
                                         pulse_gradient, 
                                         pulse_amplitude,
                                         pulse_width,
@@ -94,9 +94,9 @@ function track_equilibration_pulse_reverse_gpu!(rule::TransitionRule,
     return sa
 end
 
-function track_equilibration_fixedlayer_gpu!(rule::TransitionRule,
+function track_equilibration_fixedlayer!(rule::TransitionRule,
                                         sa::SimulatedAnnealingHamiltonian, 
-                                        state::AbstractMatrix,  
+                                        state::CuMatrix,  
                                         annealing_time; accelerate_flip = false, fixedinput = false)
     Temp_list = reverse(range(1e-5, 10.0, annealing_time))
     for this_temp in Temp_list
@@ -126,10 +126,10 @@ function track_equilibration_fixedlayer_gpu!(rule::TransitionRule,
     end
 end
 
-function track_equilibration_pulse_gpu!(rule::TransitionRule,
+function track_equilibration_pulse!(rule::TransitionRule,
                                         temprule::TemperatureGradient,
                                         sa::SimulatedAnnealingHamiltonian, 
-                                        state::AbstractMatrix, 
+                                        state::CuMatrix, 
                                         pulse_gradient, 
                                         pulse_amplitude,
                                         pulse_width,

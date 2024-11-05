@@ -97,19 +97,19 @@ end
     sa = SimulatedAnnealingHamiltonian(8, 8, CellularAutomata1D(110))
     nbatch = 2000
     state = random_state(sa, nbatch)
-    pulse_amplitude = 10.0
-    pulse_width = 1/1.3
     annealing_time = 2000
 
-    eg = ExponentialGradient(pulse_amplitude, pulse_width, 1e-5)
-    track_equilibration_pulse_cpu!(HeatBath(), eg, sa, state, annealing_time; accelerate_flip = true)
-    
+    eg = ExponentialGradient(2.0, 0.5, 1e-5)
+    tracker = SAStateTracker()
+    track_equilibration_pulse!(HeatBath(), eg, sa, state, annealing_time; accelerate_flip = true, tracker)
+    @test length(tracker.state) == length(tracker.temperature) == 2001
+ 
     state_energy = energy(sa, state)
     success = count(x -> x == 0, state_energy)
     @test abs((success / nbatch) - 0.55) <= 0.1
 
     sequential_flip_state = random_state(sa, nbatch)
-    track_equilibration_pulse_cpu!(HeatBath(), eg, sa, sequential_flip_state, annealing_time; accelerate_flip = false)
+    track_equilibration_pulse!(HeatBath(), eg, sa, sequential_flip_state, annealing_time; accelerate_flip = false)
     sequential_flip_state_energy = energy(sa, sequential_flip_state)
     sequential_flip_success = count(x -> x==0, sequential_flip_state_energy)
     @info success, sequential_flip_success
