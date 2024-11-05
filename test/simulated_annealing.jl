@@ -20,15 +20,14 @@ end
     # 1011
     sa = SimulatedAnnealingHamiltonian(4, 4, CellularAutomata1D(110))
     state = reshape([1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 1], 16, 1)
-    energy_gradient = [1]
     ibatch = 1
     @test length(state) == nspin(sa)
-    @test unsafe_evaluate_parent(sa, state, energy_gradient, 5, ibatch) == 1
-    @test unsafe_evaluate_parent(sa, state, energy_gradient, 6, ibatch) == 0
-    @test unsafe_evaluate_parent(sa, state, energy_gradient, 7, ibatch) == 0
-    @test unsafe_evaluate_parent(sa, state, energy_gradient, 8, ibatch) == 0
-    @test unsafe_evaluate_parent(sa, state, energy_gradient, 10, ibatch) == 0
-    @test calculate_energy(sa, state, energy_gradient, ibatch) == 3
+    @test unsafe_evaluate_parent(sa, state, 5, ibatch) == 1
+    @test unsafe_evaluate_parent(sa, state, 6, ibatch) == 0
+    @test unsafe_evaluate_parent(sa, state, 7, ibatch) == 0
+    @test unsafe_evaluate_parent(sa, state, 8, ibatch) == 0
+    @test unsafe_evaluate_parent(sa, state, 10, ibatch) == 0
+    @test calculate_energy(sa, state, ibatch) == 3
 end
 
 @testset "parent_nodes_child_nodes" begin
@@ -97,7 +96,7 @@ end
      sa, state, pulse_gradient, pulse_amplitude, pulse_width, annealing_time;
       accelerate_flip = true)
     
-    state_energy = [calculate_energy(sa, state, fill(1.0, nbatch), i) for i in 1:nbatch]
+    state_energy = [calculate_energy(sa, state, i) for i in 1:nbatch]
     success = count(x -> x == 0, state_energy)
     @test abs((success / nbatch) - 0.55) <= 0.1
 
@@ -105,7 +104,7 @@ end
     track_equilibration_pulse_cpu!(HeatBath(), Exponentialtype(),
      sa, sequential_flip_state, pulse_gradient, pulse_amplitude, pulse_width, annealing_time;
       accelerate_flip = false)
-    sequential_flip_state_energy = [calculate_energy(sa, sequential_flip_state, fill(1.0, nbatch), i) for i in 1:nbatch]
+    sequential_flip_state_energy = [calculate_energy(sa, sequential_flip_state, i) for i in 1:nbatch]
     sequential_flip_success = count(x -> x==0, sequential_flip_state_energy)
     @info success, sequential_flip_success
     @test abs((sequential_flip_success - success) / nbatch) <= 0.05
@@ -130,8 +129,8 @@ if CUDA.functional()
         sa, gpu_state, pulse_gradient, pulse_amplitude, pulse_width, annealing_time;
         accelerate_flip = true)   
 
-        cpu_state_energy = [calculate_energy(sa, cpu_state, fill(1.0, nbatch), i) for i in 1:nbatch]
-        gpu_state_energy = [calculate_energy(sa, Array(gpu_state), fill(1.0, nbatch), i) for i in 1:nbatch]
+        cpu_state_energy = [calculate_energy(sa, cpu_state, i) for i in 1:nbatch]
+        gpu_state_energy = [calculate_energy(sa, Array(gpu_state), i) for i in 1:nbatch]
         cpu_success = count(x -> x == 0, cpu_state_energy)
         gpu_success = count(x -> x == 0, gpu_state_energy)
         @info cpu_success, gpu_success

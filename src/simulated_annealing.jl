@@ -13,15 +13,14 @@ function random_state(sa::SimulatedAnnealingHamiltonian, nbatch::Integer)
 end
 
 # NOTE: MT and ST can be CuArray type.
-struct SARuntime{T, MT<:AbstractMatrix{T}, ST<:AbstractMatrix{Bool}, ET}    # runtime information for simulated annealing
+struct SARuntime{ET, MT<:AbstractMatrix, ST<:AbstractMatrix{Bool}}    # runtime information for simulated annealing
     hamiltonian::SimulatedAnnealingHamiltonian{ET}   # the Hamiltonian
-    energy_gradient::MT    # energy gradient
     temperature::MT    # temperature, which has the same size as state
     state::ST    # state
-    function SARuntime(hamiltonian::SimulatedAnnealingHamiltonian{ET}, energy_gradient::AbstractArray{T}, temperature::AbstractMatrix{T}, state::AbstractMatrix{Bool}) where ET
-        @assert size(energy_gradient) == size(temperature) == size(state) "energy_gradient, temperature and state must have the same size"
+    function SARuntime(hamiltonian::SimulatedAnnealingHamiltonian{ET}, temperature::AbstractMatrix, state::AbstractMatrix{Bool}) where ET
+        @assert size(temperature) == size(state) "temperature and state must have the same size"
         @assert nspin(hamiltonian) == size(state, 1) "state must have the same number of spins as the Hamiltonian"
-        new{T, typeof(energy_gradient), typeof(state), ET}(hamiltonian, energy_gradient, temperature, state)
+        new{typeof(temperature), typeof(state), ET}(hamiltonian, temperature, state)
     end
 end
 nbatch(sr::SARuntime) = size(sr.state, 2)
@@ -114,7 +113,6 @@ end
 prob_accept(::HeatBath, temperature, ΔE::Real) = inv(1 + exp(ΔE / temperature))
 
 function step_parallel!(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian, state::AbstractMatrix, temperature, flip_id)
-    # @info "flip_id = $flip_id"
     for ibatch in 1:size(state, 2)
         for this_time_flip in flip_id
             unsafe_step_kernel!(rule, sa, state, temperature, ibatch, this_time_flip)
@@ -128,8 +126,6 @@ function toymodel_pulse(rule::TempcomputeRule, sa::SimulatedAnnealingHamiltonian
                             pulse_width::Float64,
                             middle_position::Float64,
                             gradient::Float64)
-    # amplitude * e^(- (1 /width) * (x-middle_position)^2)
-    # eachposition = Tuple([pulse_amplitude * gradient^(- (1.0/pulse_width) * abs(i-middle_position)) + 1e-5 for i in 1:sa.m-1])
     eachposition = [temp_calculate(rule, pulse_amplitude, pulse_width, middle_position, gradient, i) for i in 1:sa.m-1]
     return eachposition 
 end
@@ -169,11 +165,11 @@ end
 midposition_calculate(::Exponentialtype, 
                     pulse_amplitude::Float64,
                     pulse_width::Float64,
-                    energy_gradient::Float64) = 1.0 - (-(pulse_width) * log(1e-5/pulse_amplitude) / log(energy_gradient))
+                    pulse_gradient::Float64) = 1.0 - (-(pulse_width) * log(1e-5/pulse_amplitude) / log(pulse_gradient))
 midposition_calculate(::Gaussiantype, 
                     pulse_amplitude::Float64,
                     pulse_width::Float64,
-                    energy_gradient::Float64) = 1.0 - sqrt(-(pulse_width) * log(1e-5/pulse_amplitude) /log(energy_gradient))
+                    pulse_gradient::Float64) = 1.0 - sqrt(-(pulse_width) * log(1e-5/pulse_amplitude) /log(pulse_gradient))
 
 function track_equilibration_pulse_cpu!(rule::TransitionRule,
                                         temprule::TempcomputeRule,
@@ -192,15 +188,14 @@ function track_equilibration_pulse_cpu!(rule::TransitionRule,
     for t in 1:annealing_time
         singlebatch_temp = toymodel_pulse(temprule, sa, pulse_amplitude, pulse_width, midposition, pulse_gradient)
         temperature = repeat(singlebatch_temp, 1, size(state, 2))
-        energy_gradient = fill(1.0, size(state, 2))
         if accelerate_flip == false
             for thisatom in 1:nspin(sa)
-                step!(rule, sa, state, energy_gradient, temperature, thisatom)
+                step!(rule, sa, state, temperature, thisatom)
             end
         else
             flip_list = get_parallel_flip_id(sa)
             for eachflip in flip_list
-                step_parallel!(rule, sa, state, energy_gradient, temperature, eachflip)
+                step_parallel!(rule, sa, state, temperature, eachflip)
             end
         end
         midposition += each_movement
@@ -215,15 +210,14 @@ function track_equilibration_collective_temperature_cpu!(rule::TransitionRule,
     for t in 1:annealing_time
         singlebatch_temp = fill(temperature, sa.m-1)
         temperature = repeat(singlebatch_temp, 1, size(state, 2))
-        energy_gradient = fill(1.0, size(state, 2))
         if accelerate_flip == false
             for thisatom in 1:nspin(sa)
-                step!(rule, sa, state, energy_gradient, temperature, thisatom)
+                step!(rule, sa, state, temperature, thisatom)
             end
         else
             flip_list = get_parallel_flip_id(sa)
             for eachflip in flip_list
-                step_parallel!(rule, sa, state, energy_gradient, temperature, eachflip)
+                step_parallel!(rule, sa, state, temperature, eachflip)
             end
         end
     end
@@ -255,7 +249,7 @@ function track_equilibration_pulse_reverse_cpu!(rule::TransitionRule,
         else
             flip_list = get_parallel_flip_id(sa)
             for eachflip in flip_list
-                step_parallel!(rule, sa, state, energy_gradient, temperature, eachflip)
+                step_parallel!(rule, sa, state, temperature, eachflip)
             end
         end
         midposition -= each_movement
@@ -272,15 +266,14 @@ function track_equilibration_fixedlayer_cpu!(rule::TransitionRule,
     for this_temp in Temp_list
         singlebatch_temp = fill(this_temp, sa.m-1)
         temperature = repeat(singlebatch_temp, 1, size(state, 2))
-        energy_gradient = fill(1.0, size(state, 2))
         if accelerate_flip == false
             if fixedinput == false # this time fix output
                 for thisatom in 1:nspin(sa)-sa.n
-                    step!(rule, sa, state, energy_gradient, temperature, thisatom)
+                    step!(rule, sa, state, temperature, thisatom)
                 end
             else # this time fix input
                 for thisatom in sa.n+1:nspin(sa)
-                    step!(rule, sa, state, energy_gradient, temperature, thisatom)
+                    step!(rule, sa, state, temperature, thisatom)
                 end
             end
         else
@@ -289,7 +282,7 @@ function track_equilibration_fixedlayer_cpu!(rule::TransitionRule,
                 flip_list = [[x + sa.n for x in inner_vec] for inner_vec in flip_list]
             end
             for eachflip in flip_list
-                step_parallel!(rule, sa, state, energy_gradient, temperature, eachflip)
+                step_parallel!(rule, sa, state, temperature, eachflip)
             end
         end
     end
