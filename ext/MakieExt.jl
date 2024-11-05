@@ -43,18 +43,18 @@ function init_data(n, m)
 end
 
 function energy_mesh(sa::SimulatedAnnealingHamiltonian, state::AbstractMatrix, ibatch::Int)
-    return reshape([i<=sa.n ? 0.0 : SurfaceProgrammableMaterial.unsafe_evaluate_parent(sa, state, i, ibatch) for i in 1:nspin(sa)], sa.n, sa.m)
+    return reshape([i<=sa.n ? 0.0 : SurfaceProgrammableMaterial.unsafe_energy(sa, state, i, ibatch) for i in 1:nspin(sa)], sa.n, sa.m)
 end
 function SurfaceProgrammableMaterial.animate_tracker(sa::SimulatedAnnealingHamiltonian, tracker::SAStateTracker, ibatch::Int; filename::String=tempname()*".mp4", framerate::Int=50, step::Int=1)
     @assert length(tracker.state) == length(tracker.temperature) > 0
     emesh = Observable(energy_mesh(sa, tracker.state[1], ibatch)')
     temperature = Observable(reshape(tracker.temperature[1][:, ibatch], sa.n, sa.m)')
-    f = Figure(size = (1200, 600))
+    f = Figure(size = (600, sa.n/sa.m*1200))
     ttt = Observable(0.0)
-    ax_temperature = Axis(f[1, 1], title = @lift("Step = $($ttt)"))
-    ax_energy = Axis(f[2, 1], title = "State")
-    image!(ax_temperature, temperature)
-    image!(ax_energy, emesh)
+    ax_temperature = Axis(f[1, 1], title = @lift("Step = $($ttt)"), aspect = sa.m/sa.n)
+    ax_energy = Axis(f[2, 1], title = "State", aspect = sa.m/sa.n)
+    heatmap!(ax_temperature, temperature)
+    heatmap!(ax_energy, emesh)
     record(f, filename, 1:step:length(tracker.state); framerate) do val
         @info "step = $val"
         ttt[] = val

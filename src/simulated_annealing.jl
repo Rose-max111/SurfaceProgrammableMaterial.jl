@@ -46,7 +46,8 @@ end
     @inbounds begin
         i, j = CartesianIndices((sa.n, sa.m))[inode].I
         trueoutput = sa.energy_term(state[a, ibatch], state[b, ibatch], state[c, ibatch])
-        Teff = (temperature[a, ibatch] * temperature[b, ibatch] * temperature[c, ibatch] * temperature[inode, ibatch])^0.25
+        # NOTE: two sqrt is much faster than x^0.25
+        Teff = sqrt(sqrt(temperature[a, ibatch] * temperature[b, ibatch] * temperature[c, ibatch] * temperature[inode, ibatch]))
         return trueoutput ⊻ state[inode, ibatch], Teff
     end
 end
