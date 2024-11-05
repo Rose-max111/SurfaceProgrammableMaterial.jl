@@ -2,7 +2,6 @@ module SurfaceProgrammableMaterial
 
 using BitBasis
 using CairoMakie
-using CUDA
 using Random
 using JuMP
 using GenericTensorNetworks
@@ -16,8 +15,12 @@ export TempcomputeRule, Gaussiantype, Exponentialtype
 export TransitionRule, HeatBath, Metropolis
 export SimulatedAnnealingHamiltonian
 
+# Basic gate
+export BasicGate
+
 # Export cellular automata transition ruleid
-export generic_logic_grate
+export CellularAutomata1D
+export automatarule
 
 # Export track_equilibration method
 export track_equilibration_pulse_cpu!, track_equilibration_pulse_gpu!
@@ -26,11 +29,12 @@ export track_equilibration_collective_temperature_cpu!, track_equilibration_coll
 export track_equilibration_fixedlayer_cpu!, track_equilibration_fixedlayer_gpu!
 
 # Export truth_table_mapping in LP method
-export find_proper_model, query_model
+export query_model, nspin, ground_state, IsingGadget
 
 include("superstruct.jl")
+include("basicgate.jl")
 include("ca1d.jl")
-include("cusa.jl")
+include("simulated_annealing.jl")
 include("truthtablelp.jl")
 
 end

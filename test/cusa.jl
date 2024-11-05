@@ -115,32 +115,30 @@ end
     @test abs((sequential_flip_success - success) / nbatch) <= 0.03
 end
 
-@testset "pulse_equilibration_gpu" begin
-    if CUDA.has_cuda() == false
-        @info "CUDA is not available"
-        return
+if CUDA.functional()
+    @testset "pulse_equilibration_gpu" begin
+        sa = SimulatedAnnealingHamiltonian(8, 8)
+        nbatch = 5000
+        cpu_state = random_state(sa, nbatch)
+        gpu_state = CuArray(random_state(sa, nbatch))
+        pulse_gradient = 1.3
+        pulse_amplitude = 10.0
+        pulse_width = 1.0
+        annealing_time = 2000
+
+        track_equilibration_pulse_cpu!(HeatBath(), Exponentialtype(),
+        sa, cpu_state, pulse_gradient, pulse_amplitude, pulse_width, annealing_time;
+        accelerate_flip = true)
+
+        track_equilibration_pulse_gpu!(HeatBath(), Exponentialtype(),
+        sa, gpu_state, pulse_gradient, pulse_amplitude, pulse_width, annealing_time;
+        accelerate_flip = true)   
+
+        cpu_state_energy = [calculate_energy(sa, cpu_state, fill(1.0, nbatch), i) for i in 1:nbatch]
+        gpu_state_energy = [calculate_energy(sa, Array(gpu_state), fill(1.0, nbatch), i) for i in 1:nbatch]
+        cpu_success = count(x -> x == 0, cpu_state_energy)
+        gpu_success = count(x -> x == 0, gpu_state_energy)
+        @info cpu_success, gpu_success
+        @test abs((cpu_success - gpu_success) / nbatch) <= 0.03
     end
-    sa = SimulatedAnnealingHamiltonian(8, 8)
-    nbatch = 5000
-    cpu_state = random_state(sa, nbatch)
-    gpu_state = CuArray(random_state(sa, nbatch))
-    pulse_gradient = 1.3
-    pulse_amplitude = 10.0
-    pulse_width = 1.0
-    annealing_time = 2000
-
-    track_equilibration_pulse_cpu!(HeatBath(), Exponentialtype(),
-     sa, cpu_state, pulse_gradient, pulse_amplitude, pulse_width, annealing_time;
-      accelerate_flip = true)
-
-    track_equilibration_pulse_gpu!(HeatBath(), Exponentialtype(),
-     sa, gpu_state, pulse_gradient, pulse_amplitude, pulse_width, annealing_time;
-      accelerate_flip = true)   
-
-    cpu_state_energy = [calculate_energy(sa, cpu_state, fill(1.0, nbatch), i) for i in 1:nbatch]
-    gpu_state_energy = [calculate_energy(sa, Array(gpu_state), fill(1.0, nbatch), i) for i in 1:nbatch]
-    cpu_success = count(x -> x == 0, cpu_state_energy)
-    gpu_success = count(x -> x == 0, gpu_state_energy)
-    @info cpu_success, gpu_success
-    @test abs((cpu_success - gpu_success) / nbatch) <= 0.03
 end
