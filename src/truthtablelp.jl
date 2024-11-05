@@ -33,10 +33,17 @@ end
 Base.show(io::IO, ::MIME"text/plain", ig::IsingGadget) = show(io, ig)
 
 # TODO: this function is not safe to use!
+# YM: check this function?
 function round_integer!(ig::IsingGadget)
     for v in [ig.J, ig.h]
-        v .= round.(v, digits=2)
-        v ./= 0.25
+        v .= round.(v, digits=4)
+        v .*= 10^4
+    end
+    divisior = gcd(vcat(Int.(ig.J), Int.(ig.h)))
+    if divisior != 0
+        for v in [ig.J, ig.h]
+            v .÷= divisior
+        end
     end
     return ig
 end
