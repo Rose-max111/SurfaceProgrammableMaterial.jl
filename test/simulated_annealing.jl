@@ -120,7 +120,7 @@ end
     nbatch = 2000
     annealing_time = 200
 
-    eg = ExponentialGradient(2.0, 2.0, 1e-5)
+    eg = ExponentialGradient(3.0, 2.0, 1e-5)
     tracker = SAStateTracker()
     r = SARuntime(Float64, sa, nbatch)
     track_equilibration_pulse!(r, eg, annealing_time; flip_scheme = 1:nspin(sa), tracker)
