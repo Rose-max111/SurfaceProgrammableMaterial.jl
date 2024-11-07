@@ -1,24 +1,35 @@
 module CUDAExt
 
-using CUDA
+using CUDA, SurfaceProgrammableMaterial
 import SurfaceProgrammableMaterial: unsafe_step_kernel!, parallel_scheme, nspin, SimulatedAnnealingHamiltonian, TransitionRule, TemperatureGradient
 
-function step!(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian, state::CuMatrix, energy_gradient::AbstractArray, Temp, node=nothing)
-    @inline function kernel(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian, state::AbstractMatrix, energy_gradient::AbstractArray, Temp, node=nothing)
-        ibatch = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
-        if ibatch <= size(state, 2)
-            unsafe_step_kernel!(rule, sa, state, energy_gradient, Temp, ibatch, node)
+function SurfaceProgrammableMaterial.update_temperature_gpu!(runtime::SARuntime, temprule::ColumnWiseGradient, t::Integer, annealing_time::Integer, reverse_direction::Bool)
+    dcut = cutoff_distance(temprule)
+    sa = runtime.hamiltonian
+    each_movement = (dcut * 2 + sa.m) / (annealing_time - 1)
+    middle_position = reverse_direction ? sa.m + dcut - t * each_movement : -dcut + t * each_movement
+    temperature_matrix!(reshape(view(runtime.temperature, :, 1), sa.n, sa.m), temprule, sa, middle_position)
+    
+    @inline function kernel(runtime::SARuntime)
+        id = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
+        stride = blockDim().x * gridDim().x
+        Nx = size(runtime.state, 2)
+        Ny = size(runtime.state, 1)
+        cind = CartesianIndices((Nx, Ny))
+        for k in id:stride:Nx*Ny
+            ibatch = cind[k][1]
+            spin = cind[k][2]
+            runtime.temperature[spin, ibatch] = runtime.temperature[spin, 1]
         end
         return nothing
     end
-    kernel = @cuda launch=false kernel(rule, sa, state, energy_gradient, Temp, node)
+    kernel = @cuda launch=false kernel(runtime)
     config = launch_configuration(kernel.fun)
-    threads = min(size(state, 2), config.threads)
-    blocks = cld(size(state, 2), threads)
-    CUDA.@sync kernel(rule, sa, state, energy_gradient, Temp, node; threads, blocks)
-    state
+    threads = min(size(runtime.state, 2) * size(runtime.state, 1), config.threads)
+    blocks = cld(size(runtime.state, 2) * size(runtime.state, 1), threads)
+    CUDA.@sync kernel(runtime; threads, blocks)
 end
-
+       
 function step_parallel!(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian, state::CuMatrix, energy_gradient::AbstractArray, Temp, flip_id)
     @inline function kernel(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian, state::AbstractMatrix, energy_gradient::AbstractArray, Temp, flip_id)
         id = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
@@ -40,6 +51,23 @@ function step_parallel!(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian,
     CUDA.@sync kernel(rule, sa, state, energy_gradient, Temp, flip_id; threads, blocks)
     state
 end
+
+function step!(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian, state::CuMatrix, energy_gradient::AbstractArray, Temp, node=nothing)
+    @inline function kernel(rule::TransitionRule, sa::SimulatedAnnealingHamiltonian, state::AbstractMatrix, energy_gradient::AbstractArray, Temp, node=nothing)
+        ibatch = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
+        if ibatch <= size(state, 2)
+            unsafe_step_kernel!(rule, sa, state, energy_gradient, Temp, ibatch, node)
+        end
+        return nothing
+    end
+    kernel = @cuda launch=false kernel(rule, sa, state, energy_gradient, Temp, node)
+    config = launch_configuration(kernel.fun)
+    threads = min(size(state, 2), config.threads)
+    blocks = cld(size(state, 2), threads)
+    CUDA.@sync kernel(rule, sa, state, energy_gradient, Temp, node; threads, blocks)
+    state
+end
+
 
 function track_equilibration_collective_temperature!(rule::TransitionRule,
                                         sa::SimulatedAnnealingHamiltonian, 
