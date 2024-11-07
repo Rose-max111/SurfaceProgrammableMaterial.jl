@@ -1,13 +1,10 @@
 using Test, CUDA
 using SurfaceProgrammableMaterial
-using SurfaceProgrammableMaterial: nspin, spins
+using SurfaceProgrammableMaterial: spins
 using SurfaceProgrammableMaterial: unsafe_energy_temperature
 using SurfaceProgrammableMaterial: unsafe_parent_nodes, unsafe_child_nodes
-using SurfaceProgrammableMaterial: SimulatedAnnealingHamiltonian
 using SurfaceProgrammableMaterial: parallel_scheme
-using SurfaceProgrammableMaterial: random_state
 using SurfaceProgrammableMaterial: update_temperature!
-using SurfaceProgrammableMaterial: SARuntime_CUDA
 
 @testset "basic_hamiltonian" begin
     sa = SimulatedAnnealingHamiltonian(2, 3, CellularAutomata1D(110))
@@ -20,9 +17,16 @@ end
     d = SurfaceProgrammableMaterial.cutoff_distance(eg)
     # one 1e-5 is the lowest temperature, another 1e-5 is from the wave packet
     @test SurfaceProgrammableMaterial.evaluate_temperature(eg, d) ≈ 2e-5
+    @test SurfaceProgrammableMaterial.lowest_temperature(eg) == 1e-5
     gg = GaussianGradient(1.0, 1.0, 1e-5)
     d = SurfaceProgrammableMaterial.cutoff_distance(gg)
     @test SurfaceProgrammableMaterial.evaluate_temperature(gg, d) ≈ 2e-5
+    @test SurfaceProgrammableMaterial.lowest_temperature(gg) == 1e-5
+    sg = SigmoidGradient(1.0, 1e-5, 1.0)
+    d = SurfaceProgrammableMaterial.cutoff_distance(sg)
+    @test isapprox(SurfaceProgrammableMaterial.evaluate_temperature(sg, -d), 2e-5, atol=1e-6)
+    @test isapprox(SurfaceProgrammableMaterial.evaluate_temperature(sg, d), 1-1e-5, atol=1e-6)
+    @test SurfaceProgrammableMaterial.lowest_temperature(sg) == 1e-5
 end
 
 if CUDA.functional()
@@ -124,6 +128,7 @@ end
     r = SARuntime(Float64, sa, nbatch)
     track_equilibration_pulse!(r, eg, annealing_time; flip_scheme = 1:nspin(sa), tracker)
     @test length(tracker.state) == length(tracker.temperature) == 201
+    @test why(r) === nothing
  
     state_energy = energy(sa, r.state)
     success = count(x -> x == 0, state_energy)
