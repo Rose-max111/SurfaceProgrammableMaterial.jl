@@ -21,6 +21,7 @@ export automatarule
 
 # Export track_equilibration method
 export track_equilibration_pulse!, track_equilibration_pulse_reverse!, SAStateTracker, SARuntime
+export SARuntime_CUDA
 export track_equilibration_collective_temperature!, track_equilibration_fixedlayer!
 
 # Export truth_table_mapping in LP method

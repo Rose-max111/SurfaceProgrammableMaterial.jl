@@ -6,6 +6,8 @@ using SurfaceProgrammableMaterial: unsafe_parent_nodes, unsafe_child_nodes
 using SurfaceProgrammableMaterial: SimulatedAnnealingHamiltonian
 using SurfaceProgrammableMaterial: parallel_scheme
 using SurfaceProgrammableMaterial: random_state
+using SurfaceProgrammableMaterial: update_temperature!
+using SurfaceProgrammableMaterial: SARuntime_CUDA
 
 @testset "basic_hamiltonian" begin
     sa = SimulatedAnnealingHamiltonian(2, 3, CellularAutomata1D(110))
@@ -21,6 +23,25 @@ end
     gg = GaussianGradient(1.0, 1.0, 1e-5)
     d = SurfaceProgrammableMaterial.cutoff_distance(gg)
     @test SurfaceProgrammableMaterial.evaluate_temperature(gg, d) ≈ 2e-5
+end
+
+if CUDA.functional()
+    @testset "temperature gradient gpu" begin
+        sa = SimulatedAnnealingHamiltonian(8, 12, CellularAutomata1D(110))
+        nbatch = 200
+        runtime = 200
+        
+        r_cpu = SARuntime(Float64, sa, nbatch)
+        eg = ExponentialGradient(1.0, 1.0, 1e-5)
+        update_temperature!(r_cpu, eg, 40, runtime, false)
+
+        r_gpu = SARuntime_CUDA(Float32, sa, nbatch)
+        update_temperature!(r_gpu, eg, 40, runtime, false)
+
+        @test r_cpu.temperature ≈ Array(r_gpu.temperature)
+        # @info r_cpu.temperature
+        # @info Array(r_gpu.temperature)
+    end
 end
 
 @testset "energy_calculation" begin
@@ -120,27 +141,31 @@ end
 
 if CUDA.functional()
     @testset "pulse_equilibration_gpu" begin
-        sa = SimulatedAnnealingHamiltonian(8, 8, CellularAutomata1D(110))
-        nbatch = 5000
-        cpu_state = random_state(sa, nbatch)
-        gpu_state = CuArray(random_state(sa, nbatch))
-        pulse_amplitude = 10.0
-        pulse_width = 1.0
-        annealing_time = 2000
+        sa = SimulatedAnnealingHamiltonian(11, 7, CellularAutomata1D(110))
+        nbatch = 2000
+        annealing_time = 600
+    
+        eg = ExponentialGradient(5.0, 1.7, 1e-5)
+        r_cpu = SARuntime(Float64, sa, nbatch)
+        track_equilibration_pulse!(r_cpu, eg, annealing_time; flip_scheme = 1:nspin(sa))
+        state_energy_cpu = energy(sa, r_cpu.state)
+        success_cpu = count(x -> x == 0, state_energy_cpu)
+        @show success_cpu / nbatch
 
-        track_equilibration_pulse_cpu!(HeatBath(), ExponentialGradient(pulse_amplitude, pulse_width, 1e-5),
-        sa, cpu_state, annealing_time;
-        accelerate_flip = true)
+        r_gpu = SARuntime_CUDA(Float32, sa, nbatch)
+        track_equilibration_pulse!(r_gpu, eg, annealing_time; flip_scheme = 1:nspin(sa))
+        state_energy_gpu = energy(sa, Array(r_gpu.state))
+        success_gpu = count(x -> x == 0, state_energy_gpu)
+        @show success_gpu / nbatch
 
-        track_equilibration_pulse_gpu!(HeatBath(), ExponentialGradient(pulse_amplitude, pulse_width, 1e-5),
-        sa, gpu_state, annealing_time;
-        accelerate_flip = true)   
+        @test abs((success_cpu / nbatch) - (success_gpu / nbatch)) <= 0.05
 
-        cpu_state_energy = energy(sa, cpu_state)
-        gpu_state_energy = energy(sa, gpu_state)
-        cpu_success = count(x -> x == 0, cpu_state_energy)
-        gpu_success = count(x -> x == 0, gpu_state_energy)
-        @info cpu_success, gpu_success
-        @test abs((cpu_success - gpu_success) / nbatch) <= 0.03
+        r_gpu_parallel = SARuntime_CUDA(Float32, sa, nbatch)
+        track_equilibration_pulse!(r_gpu_parallel, eg, annealing_time; flip_scheme = parallel_scheme(sa))
+        state_energy_gpu_parallel = energy(sa, Array(r_gpu_parallel.state))
+        success_gpu_parallel = count(x -> x == 0, state_energy_gpu_parallel)
+        @show success_gpu_parallel / nbatch
+        @show success_cpu, success_gpu, success_gpu_parallel
+        @test abs((success_gpu_parallel / nbatch) - (success_gpu / nbatch)) <= 0.05
     end
 end

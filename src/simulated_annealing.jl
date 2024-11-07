@@ -32,6 +32,7 @@ nbatch(sr::SARuntime) = size(sr.state, 2)
 function SARuntime(::Type{T}, sa::SimulatedAnnealingHamiltonian{ET}, nbatch::Integer) where {T, ET}
     return SARuntime(sa, random_state(sa, nbatch), ones(T, nspin(sa), nbatch))
 end
+function SARuntime_CUDA end
 
 @inline function unsafe_energy(sa::SimulatedAnnealingHamiltonian, state::AbstractMatrix, inode::Integer, ibatch::Integer)
     (a, b, c) = unsafe_parent_nodes(sa, inode)
@@ -146,6 +147,7 @@ function update_temperature!(runtime::SARuntime, temprule::ColumnWiseGradient, t
         runtime.temperature[spin, ibatch] = runtime.temperature[spin, 1]
     end
 end
+function update_temperature! end
 function temperature_matrix!(output::AbstractMatrix, tg::ColumnWiseGradient, sa::SimulatedAnnealingHamiltonian, middle_position::Real)
     for j in 1:sa.m
         t = evaluate_temperature(tg, middle_position - j)
