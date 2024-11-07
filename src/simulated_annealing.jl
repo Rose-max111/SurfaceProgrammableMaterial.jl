@@ -32,7 +32,6 @@ nbatch(sr::SARuntime) = size(sr.state, 2)
 function SARuntime(::Type{T}, sa::SimulatedAnnealingHamiltonian{ET}, nbatch::Integer) where {T, ET}
     return SARuntime(sa, random_state(sa, nbatch), ones(T, nspin(sa), nbatch))
 end
-function SARuntime_CUDA end
 
 @inline function unsafe_energy(sa::SimulatedAnnealingHamiltonian, state::AbstractMatrix, inode::Integer, ibatch::Integer)
     (a, b, c) = unsafe_parent_nodes(sa, inode)
@@ -148,10 +147,10 @@ end
 function update_temperature! end
 function temperature_matrix!(output::AbstractMatrix, tg::ColumnWiseGradient, sa::SimulatedAnnealingHamiltonian, middle_position::Real)
     offsets = _match_device(output, 1:sa.m)
-    t = evaluate_temperature.(Ref(tg), middle_position .- offsets)
+    t = evaluate_temperature.(Ref(tg), offsets .- middle_position)
     output .= reshape(t, 1, :)  # broadcast assignment
 end
-_match_device(output::AbstractMatrix, offsets) = offsets
+_match_device(::AbstractMatrix, offsets) = offsets
 
 function track_equilibration_pulse!(
                 runtime::SARuntime,
@@ -180,5 +179,36 @@ end
 function step!(runtime::SARuntime, transition_rule::TransitionRule, simutanuous_flip_spins)
     for ibatch in 1:size(runtime.state, 2), spin in simutanuous_flip_spins
         unsafe_step_kernel!(transition_rule, runtime.hamiltonian, runtime.state, runtime.temperature, ibatch, spin)
+    end
+end
+
+# examine the state and explain why the SA fails (if any).
+function why(r::SARuntime)
+    sim, state, temperature = r.hamiltonian, r.state, r.temperature
+    grid = CartesianIndices((sim.n, sim.m))
+    for ibatch in 1:size(r.state, 2)
+        @info "analyzing batch $ibatch"
+        for ispin in sim.n+1:nspin(sim)
+            local_energy = unsafe_energy(sim, state, ispin, ibatch)
+            i, j = grid[ispin].I
+            if local_energy != 0  # an error dectected!
+                @info "error detected at spin $((i, j)), batch $ibatch"
+                a, b, c = unsafe_parent_nodes(sim, ispin)
+                sa, sb, sc = Int(state[a, ibatch]), Int(state[b, ibatch]), Int(state[c, ibatch])
+                ca, cb, cc = grid[a].I, grid[b].I, grid[c].I
+                @info "- parents: $ca = $sa, $cb = $sb, $cc = $sc"
+                expected_state = sim.energy_term(sa, sb, sc)
+                @info "- got: $(Int(state[ispin, ibatch])) instead of $expected_state"
+                children = unsafe_child_nodes(sim, ispin)
+                nc = 0
+                for child in children
+                    parents = unsafe_parent_nodes(sim, child)
+                    if sim.energy_term(map(p->p==ispin ? !state[ispin, ibatch] : state[p, ibatch], parents)...) != state[child, ibatch]
+                        nc += 1
+                    end
+                end
+                @info "- by flipping it, $nc children will be violated"
+            end
+        end
     end
 end

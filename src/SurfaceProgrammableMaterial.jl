@@ -7,26 +7,26 @@ using GenericTensorNetworks
 using COPT
 using HiGHS
 
-# Export some abstract type used in code
-export GaussianGradient, ExponentialGradient, ColumnWiseGradient, TemperatureGradient
+# Temperature gradient
+export GaussianGradient, ExponentialGradient, SigmoidGradient, ColumnWiseGradient, TemperatureGradient
+
+# Transition rule
 export TransitionRule, HeatBath, Metropolis
 export SimulatedAnnealingHamiltonian, energy, random_state
 
 # Basic gate
 export BasicGate
 
-# Export cellular automata transition ruleid
-export CellularAutomata1D
-export automatarule
+# Cellular automata transition rule
+export CellularAutomata1D, automatarule
 
-# Export track_equilibration method
-export track_equilibration_pulse!, track_equilibration_pulse_reverse!, SAStateTracker, SARuntime
-export SARuntime_CUDA
-export track_equilibration_collective_temperature!, track_equilibration_fixedlayer!
+# Track equilibration method
+export track_equilibration_pulse!, SAStateTracker, SARuntime, why
 
-# Export truth_table_mapping in LP method
+# Truth table mapping in LP method
 export query_model, nspin, ground_state, IsingGadget
 
+# Visualize method
 export show_temperature_matrix, animate_tracker
 
 include("superstruct.jl")
