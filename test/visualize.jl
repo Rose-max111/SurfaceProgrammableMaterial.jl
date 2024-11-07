@@ -13,5 +13,5 @@ using Test, SurfaceProgrammableMaterial, CairoMakie
     annealing_time = 2000
     r = SARuntime(Float64, sa, 10)
     track_equilibration_pulse!(r, eg, annealing_time; tracker, reverse_direction=true)
-    @test animate_tracker(sa, tracker, 1; step=10, cutoffT=eg.lowest_temperature*2) === nothing
+    @test animate_tracker(sa, tracker, 1; step=10, cutoffT=SurfaceProgrammableMaterial.lowest_temperature(eg)*2) === nothing
 end

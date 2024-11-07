@@ -6,12 +6,6 @@ using SurfaceProgrammableMaterial: unsafe_parent_nodes, unsafe_child_nodes
 using SurfaceProgrammableMaterial: parallel_scheme
 using SurfaceProgrammableMaterial: update_temperature!
 
-@testset "nthroot" begin
-    @test nthroot(2, 4.0) ≈ 2
-    @test nthroot(3, 27.0) ≈ 3
-    @test nthroot(4, 16.0) ≈ 2
-end
-
 @testset "basic_hamiltonian" begin
     sa = SimulatedAnnealingHamiltonian(2, 3, CellularAutomata1D(110))
     @test nspin(sa) == 6
@@ -23,13 +17,16 @@ end
     d = SurfaceProgrammableMaterial.cutoff_distance(eg)
     # one 1e-5 is the lowest temperature, another 1e-5 is from the wave packet
     @test SurfaceProgrammableMaterial.evaluate_temperature(eg, d) ≈ 2e-5
+    @test SurfaceProgrammableMaterial.lowest_temperature(eg) == 1e-5
     gg = GaussianGradient(1.0, 1.0, 1e-5)
     d = SurfaceProgrammableMaterial.cutoff_distance(gg)
     @test SurfaceProgrammableMaterial.evaluate_temperature(gg, d) ≈ 2e-5
+    @test SurfaceProgrammableMaterial.lowest_temperature(gg) == 1e-5
     sg = SigmoidGradient(1.0, 1e-5, 1.0)
     d = SurfaceProgrammableMaterial.cutoff_distance(sg)
     @test isapprox(SurfaceProgrammableMaterial.evaluate_temperature(sg, -d), 2e-5, atol=1e-6)
     @test isapprox(SurfaceProgrammableMaterial.evaluate_temperature(sg, d), 1-1e-5, atol=1e-6)
+    @test SurfaceProgrammableMaterial.lowest_temperature(sg) == 1e-5
 end
 
 if CUDA.functional()
