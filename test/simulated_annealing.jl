@@ -35,7 +35,7 @@ if CUDA.functional()
         eg = ExponentialGradient(1.0, 1.0, 1e-5)
         update_temperature!(r_cpu, eg, 40, runtime, false)
 
-        r_gpu = SARuntime_CUDA(Float32, sa, nbatch)
+        r_gpu = CUDA.cu(r_cpu)
         update_temperature!(r_gpu, eg, 40, runtime, false)
 
         @test r_cpu.temperature ≈ Array(r_gpu.temperature)
@@ -53,12 +53,11 @@ end
     state = reshape(Bool[1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 1], 16, 1)
     ibatch = 1
     @test length(state) == nspin(sa)
-    runtime = SARuntime(sa, state, ones(Float64, size(state)))
-    @test unsafe_energy_temperature(runtime, 5, ibatch)[1] == 1
-    @test unsafe_energy_temperature(runtime, 6, ibatch)[1] == 0
-    @test unsafe_energy_temperature(runtime, 7, ibatch)[1] == 0
-    @test unsafe_energy_temperature(runtime, 8, ibatch)[1] == 0
-    @test unsafe_energy_temperature(runtime, 10, ibatch)[1] == 0
+    @test unsafe_energy_temperature(sa, state, ones(Float64, size(state)), 5, ibatch)[1] == 1
+    @test unsafe_energy_temperature(sa, state, ones(Float64, size(state)), 6, ibatch)[1] == 0
+    @test unsafe_energy_temperature(sa, state, ones(Float64, size(state)), 7, ibatch)[1] == 0
+    @test unsafe_energy_temperature(sa, state, ones(Float64, size(state)), 8, ibatch)[1] == 0
+    @test unsafe_energy_temperature(sa, state, ones(Float64, size(state)), 10, ibatch)[1] == 0
     @test energy(sa, state)[ibatch] == 3
 end
 
@@ -112,7 +111,7 @@ end
             sa = SimulatedAnnealingHamiltonian(n, m, CellularAutomata1D(110))
             test_flip_id(sa)
         end
-:wait    end
+    end
 end
 
 @testset "pulse_equilibration_cpu" begin
@@ -152,7 +151,7 @@ if CUDA.functional()
         success_cpu = count(x -> x == 0, state_energy_cpu)
         @show success_cpu / nbatch
 
-        r_gpu = SARuntime_CUDA(Float32, sa, nbatch)
+        r_gpu = CUDA.cu(r_cpu)
         track_equilibration_pulse!(r_gpu, eg, annealing_time; flip_scheme = 1:nspin(sa))
         state_energy_gpu = energy(sa, Array(r_gpu.state))
         success_gpu = count(x -> x == 0, state_energy_gpu)
@@ -160,8 +159,8 @@ if CUDA.functional()
 
         @test abs((success_cpu / nbatch) - (success_gpu / nbatch)) <= 0.05
 
-        r_gpu_parallel = SARuntime_CUDA(Float32, sa, nbatch)
-        track_equilibration_pulse!(r_gpu_parallel, eg, annealing_time; flip_scheme = parallel_scheme(sa))
+        r_gpu_parallel = CUDA.cu(r_cpu)
+        track_equilibration_pulse!(r_gpu_parallel, eg, annealing_time; flip_scheme = CUDA.cu.(parallel_scheme(sa)))
         state_energy_gpu_parallel = energy(sa, Array(r_gpu_parallel.state))
         success_gpu_parallel = count(x -> x == 0, state_energy_gpu_parallel)
         @show success_gpu_parallel / nbatch

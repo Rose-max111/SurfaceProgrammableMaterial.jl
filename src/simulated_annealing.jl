@@ -44,40 +44,40 @@ function SARuntime_CUDA end
 end
 
 @inline function unsafe_step_kernel!(transition_rule::TransitionRule,
-        runtime::SARuntime{T, ET},
+        sa::SimulatedAnnealingHamiltonian{ET},
+        state::AbstractMatrix{Bool},
+        temperature::AbstractMatrix{T},
         ibatch::Integer,
         node::Integer
     ) where {T, ET<:CellularAutomata1D}
     @inbounds begin
-        sa = runtime.hamiltonian
         grid = CartesianIndices((sa.n, sa.m))
         i, j = grid[node].I  # proposed position
 
-        ΔE_over_T_previous_layer = j > 1 ? ((ΔE, Teff) = unsafe_energy_temperature(runtime, node, ibatch); (one(T) - 2 * ΔE) / Teff) : zero(T)
+        ΔE_over_T_previous_layer = j > 1 ? ((ΔE, Teff) = unsafe_energy_temperature(sa, state, temperature, node, ibatch); (one(T) - 2 * ΔE) / Teff) : zero(T)
         ΔE_over_T_next_layer = zero(T)
         if j < sa.m # not the last layer
             # calculate the energy from the child nodes
             cnodes = unsafe_child_nodes(sa, node)
             for node in cnodes
-                (ΔE, Teff) = unsafe_energy_temperature(runtime, node, ibatch);
+                (ΔE, Teff) = unsafe_energy_temperature(sa, state, temperature, node, ibatch);
                 ΔE_over_T_next_layer -= ΔE / Teff
             end
             # calculate the energy from the child nodes after flipping
-            runtime.state[node, ibatch] ⊻= true
+            state[node, ibatch] ⊻= true
             for node in cnodes
-                (ΔE, Teff) = unsafe_energy_temperature(runtime, node, ibatch);
+                (ΔE, Teff) = unsafe_energy_temperature(sa, state, temperature, node, ibatch);
                 ΔE_over_T_next_layer += ΔE / Teff
             end
-            runtime.state[node, ibatch] ⊻= true
+            state[node, ibatch] ⊻= true
         end
         ΔE_over_T = ΔE_over_T_previous_layer + ΔE_over_T_next_layer
         if rand() < prob_accept(transition_rule, ΔE_over_T)
-            runtime.state[node, ibatch] ⊻= true
+            state[node, ibatch] ⊻= true
         end
     end
 end
-@inline function unsafe_energy_temperature(runtime::SARuntime{T, ET}, inode::Integer, ibatch::Integer) where {T, ET<:CellularAutomata1D}
-    sa, temperature, state = runtime.hamiltonian, runtime.temperature, runtime.state
+@inline function unsafe_energy_temperature(sa::SimulatedAnnealingHamiltonian{ET}, state::AbstractMatrix{Bool}, temperature::AbstractMatrix{T}, inode::Integer, ibatch::Integer) where {T, ET<:CellularAutomata1D}
     (a, b, c) = unsafe_parent_nodes(sa, inode)
     @inbounds begin
         i, j = CartesianIndices((sa.n, sa.m))[inode].I
@@ -143,19 +143,15 @@ function update_temperature!(runtime::SARuntime, temprule::ColumnWiseGradient, t
     each_movement = (dcut * 2 + sa.m) / (annealing_time - 1)
     middle_position = reverse_direction ? sa.m + dcut - t * each_movement : -dcut + t * each_movement
     temperature_matrix!(reshape(view(runtime.temperature, :, 1), sa.n, sa.m), temprule, sa, middle_position)
-    for ibatch in 1:size(runtime.temperature, 2), spin in 1:nspin(sa)
-        runtime.temperature[spin, ibatch] = runtime.temperature[spin, 1]
-    end
+    view(runtime.temperature, :, 2:size(runtime.temperature, 2)) .= view(runtime.temperature, :, 1:1)
 end
 function update_temperature! end
 function temperature_matrix!(output::AbstractMatrix, tg::ColumnWiseGradient, sa::SimulatedAnnealingHamiltonian, middle_position::Real)
-    for j in 1:sa.m
-        t = evaluate_temperature(tg, middle_position - j)
-        for i in 1:sa.n
-            output[i, j] = t
-        end
-    end
+    offsets = _match_device(output, 1:sa.m)
+    t = evaluate_temperature.(Ref(tg), middle_position .- offsets)
+    output .= reshape(t, 1, :)  # broadcast assignment
 end
+_match_device(output::AbstractMatrix, offsets) = offsets
 
 function track_equilibration_pulse!(
                 runtime::SARuntime,
@@ -167,7 +163,7 @@ function track_equilibration_pulse!(
                 reverse_direction::Bool=false
             )
     sa = runtime.hamiltonian
-    @assert sort!(vcat(flip_scheme...)) == collect(1:nspin(sa)) "invalid flip scheme: $flip_scheme, must be a perfect cover of all spins: $(1:nspin(sa))"
+    @assert all(sort!(vcat(flip_scheme...)) .== 1:nspin(sa)) "invalid flip scheme: $flip_scheme, must be a perfect cover of all spins: $(1:nspin(sa))"
 
     update_temperature!(runtime, temprule, 0, annealing_time, reverse_direction)
     tracker !== nothing && track!(tracker, copy(runtime.state), copy(runtime.temperature))
@@ -175,10 +171,14 @@ function track_equilibration_pulse!(
         update_temperature!(runtime, temprule, t, annealing_time, reverse_direction)
         for spins in flip_scheme
             # step on a subset of nodes and all batches
-            for ibatch in 1:size(runtime.state, 2), spin in spins
-                unsafe_step_kernel!(transition_rule, runtime, ibatch, spin)
-            end
+            step!(runtime, transition_rule, spins)
         end
         tracker !== nothing && track!(tracker, copy(runtime.state), copy(runtime.temperature))
+    end
+end
+
+function step!(runtime::SARuntime, transition_rule::TransitionRule, simutanuous_flip_spins)
+    for ibatch in 1:size(runtime.state, 2), spin in simutanuous_flip_spins
+        unsafe_step_kernel!(transition_rule, runtime.hamiltonian, runtime.state, runtime.temperature, ibatch, spin)
     end
 end
