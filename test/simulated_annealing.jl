@@ -22,7 +22,7 @@ end
     d = SurfaceProgrammableMaterial.cutoff_distance(gg)
     @test SurfaceProgrammableMaterial.evaluate_temperature(gg, d) ≈ 2e-5
     @test SurfaceProgrammableMaterial.lowest_temperature(gg) == 1e-5
-    sg = SigmoidGradient(1.0, 1e-5, 1.0)
+    sg = SigmoidGradient(1.0, 1.0, 1e-5)
     d = SurfaceProgrammableMaterial.cutoff_distance(sg)
     @test isapprox(SurfaceProgrammableMaterial.evaluate_temperature(sg, -d), 2e-5, atol=1e-6)
     @test isapprox(SurfaceProgrammableMaterial.evaluate_temperature(sg, d), 1-1e-5, atol=1e-6)
