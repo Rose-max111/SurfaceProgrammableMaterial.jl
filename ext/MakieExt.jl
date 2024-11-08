@@ -1,5 +1,6 @@
 module MakieExt
 using CairoMakie, SurfaceProgrammableMaterial
+using SurfaceProgrammableMaterial: evaluate_temperature
 
 function SurfaceProgrammableMaterial.show_temperature_matrix(tg::TemperatureGradient, sa::SimulatedAnnealingHamiltonian, middle_position::Real)
     tm = zeros(sa.n, sa.m)
@@ -35,5 +36,14 @@ function SurfaceProgrammableMaterial.animate_tracker(sa::SimulatedAnnealingHamil
         temperature[] = reshape(tracker.temperature[val][:, ibatch], sa.n, sa.m)'
     end
     @info "Video saved to: $filename"
+end
+
+function SurfaceProgrammableMaterial.temperature_curve(tg::TemperatureGradient, minimum_distance::Real, maximum_distance::Real)
+    x = range(minimum_distance, maximum_distance, length=500)
+    y = [evaluate_temperature(tg, i) for i in x]
+    fig = Figure()
+    ax = Axis(fig[1, 1], xlabel = "distance", ylabel = "temperature")
+    lines!(ax, x, y)
+    return fig
 end
 end

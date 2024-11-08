@@ -22,7 +22,7 @@ end
     d = SurfaceProgrammableMaterial.cutoff_distance(gg)
     @test SurfaceProgrammableMaterial.evaluate_temperature(gg, d) ≈ 2e-5
     @test SurfaceProgrammableMaterial.lowest_temperature(gg) == 1e-5
-    sg = SigmoidGradient(1.0, 1e-5, 1.0)
+    sg = SigmoidGradient(1.0, 1.0, 1e-5)
     d = SurfaceProgrammableMaterial.cutoff_distance(sg)
     @test isapprox(SurfaceProgrammableMaterial.evaluate_temperature(sg, -d), 2e-5, atol=1e-6)
     @test isapprox(SurfaceProgrammableMaterial.evaluate_temperature(sg, d), 1-1e-5, atol=1e-6)
@@ -120,7 +120,7 @@ end
 
 @testset "pulse_equilibration_cpu" begin
     sa = SimulatedAnnealingHamiltonian(8, 8, CellularAutomata1D(110))
-    nbatch = 2000
+    nbatch = 5000
     annealing_time = 200
 
     eg = ExponentialGradient(2.0, 2.0, 1e-5)
@@ -145,16 +145,23 @@ end
 
 if CUDA.functional()
     @testset "pulse_equilibration_gpu" begin
-        sa = SimulatedAnnealingHamiltonian(11, 7, CellularAutomata1D(110))
+        CUDA.device!(1)
+        sa = SimulatedAnnealingHamiltonian(20, 20, CellularAutomata1D(110))
         nbatch = 2000
-        annealing_time = 600
+        annealing_time = 520
     
-        eg = ExponentialGradient(5.0, 1.7, 1e-5)
+        eg = SigmoidGradient(2.0, 1.0, -1 / log(1e-5))
         r_cpu = SARuntime(Float64, sa, nbatch)
         track_equilibration_pulse!(r_cpu, eg, annealing_time; flip_scheme = 1:nspin(sa))
         state_energy_cpu = energy(sa, r_cpu.state)
         success_cpu = count(x -> x == 0, state_energy_cpu)
         @show success_cpu / nbatch
+
+        r_gpu_parallel = CUDA.cu(r_cpu)
+        track_equilibration_pulse!(r_gpu_parallel, eg, annealing_time; flip_scheme = CUDA.cu.(parallel_scheme(sa)))
+        state_energy_gpu_parallel = energy(sa, Array(r_gpu_parallel.state))
+        success_gpu_parallel = count(x -> x == 0, state_energy_gpu_parallel)
+        @show success_gpu_parallel / nbatch
 
         r_gpu = CUDA.cu(r_cpu)
         track_equilibration_pulse!(r_gpu, eg, annealing_time; flip_scheme = 1:nspin(sa))
@@ -164,11 +171,6 @@ if CUDA.functional()
 
         @test abs((success_cpu / nbatch) - (success_gpu / nbatch)) <= 0.05
 
-        r_gpu_parallel = CUDA.cu(r_cpu)
-        track_equilibration_pulse!(r_gpu_parallel, eg, annealing_time; flip_scheme = CUDA.cu.(parallel_scheme(sa)))
-        state_energy_gpu_parallel = energy(sa, Array(r_gpu_parallel.state))
-        success_gpu_parallel = count(x -> x == 0, state_energy_gpu_parallel)
-        @show success_gpu_parallel / nbatch
         @show success_cpu, success_gpu, success_gpu_parallel
         @test abs((success_gpu_parallel / nbatch) - (success_gpu / nbatch)) <= 0.05
     end
