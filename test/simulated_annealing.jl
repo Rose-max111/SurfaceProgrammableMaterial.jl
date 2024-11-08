@@ -145,11 +145,12 @@ end
 
 if CUDA.functional()
     @testset "pulse_equilibration_gpu" begin
-        sa = SimulatedAnnealingHamiltonian(11, 7, CellularAutomata1D(110))
-        nbatch = 2000
-        annealing_time = 600
+        CUDA.device!(1)
+        sa = SimulatedAnnealingHamiltonian(20, 20, CellularAutomata1D(110))
+        nbatch = 200
+        annealing_time = 4000
     
-        eg = ExponentialGradient(5.0, 1.7, 1e-5)
+        eg = SigmoidGradient(2.0, 1.0, 1e-5)
         r_cpu = SARuntime(Float64, sa, nbatch)
         track_equilibration_pulse!(r_cpu, eg, annealing_time; flip_scheme = 1:nspin(sa))
         state_energy_cpu = energy(sa, r_cpu.state)

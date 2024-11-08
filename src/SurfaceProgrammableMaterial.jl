@@ -22,6 +22,7 @@ export CellularAutomata1D, automatarule
 
 # Track equilibration method
 export track_equilibration_pulse!, SAStateTracker, SARuntime, why
+export parallel_scheme
 
 # Truth table mapping in LP method
 export query_model, nspin, ground_state, IsingGadget

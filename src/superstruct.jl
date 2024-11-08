@@ -26,10 +26,11 @@ cutoff_distance(eg::ExponentialGradient) = -eg.width * log(eg.lowest_temperature
 lowest_temperature(eg::ExponentialGradient) = eg.lowest_temperature
 
 # SigmoidGradient temperature gradient: T(distance) = low_temperature + (high_temperature - low_temperature) / (1 + exp(-distance / width))
+# NOTE: I changed the order of the variables in the below struct definition
 struct SigmoidGradient <: ColumnWiseGradient
     high_temperature::Float64
-    low_temperature::Float64
     width::Float64
+    low_temperature::Float64
 end
 function evaluate_temperature(sg::SigmoidGradient, distance::Real)
     return sg.low_temperature + (sg.high_temperature - sg.low_temperature) / (1 + exp(-distance/sg.width))

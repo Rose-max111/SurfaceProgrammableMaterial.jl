@@ -151,6 +151,7 @@ function temperature_matrix!(output::AbstractMatrix, tg::ColumnWiseGradient, sa:
     output .= reshape(t, 1, :)  # broadcast assignment
 end
 _match_device(::AbstractMatrix, offsets) = offsets
+_flip_match_device(::SARuntime, spins) = spins
 
 function track_equilibration_pulse!(
                 runtime::SARuntime,
@@ -170,7 +171,7 @@ function track_equilibration_pulse!(
         update_temperature!(runtime, temprule, t, annealing_time, reverse_direction)
         for spins in flip_scheme
             # step on a subset of nodes and all batches
-            step!(runtime, transition_rule, spins)
+            step!(runtime, transition_rule, _flip_match_device(runtime, spins))
         end
         tracker !== nothing && track!(tracker, copy(runtime.state), copy(runtime.temperature))
     end
