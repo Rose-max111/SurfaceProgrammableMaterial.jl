@@ -120,7 +120,7 @@ end
 
 @testset "pulse_equilibration_cpu" begin
     sa = SimulatedAnnealingHamiltonian(8, 8, CellularAutomata1D(110))
-    nbatch = 2000
+    nbatch = 5000
     annealing_time = 200
 
     eg = ExponentialGradient(2.0, 2.0, 1e-5)
