@@ -1,4 +1,5 @@
 using SurfaceProgrammableMaterial
+using CairoMakie
 using Random
 
 function main(;
@@ -24,4 +25,5 @@ function main(;
 end
 
 r = main(n=20, m=50, Tmax=2.0, width=1.0, epsilon=1e-5, annealing_time=4000, seed=42)
+
 why(r)
