@@ -25,7 +25,7 @@ function evaluate_p_percentage_velocity(tg::TemperatureGradient,
         r = SARuntime(Float64, sa, nbatch)
         CUDA_functional == true ? (r = CUDA.cu(r)) : nothing
 
-        track_equilibration_pulse!(r, tg, sweep_time + maxtry; flip_scheme)
+        track_equilibration_pulse!(r, tg, Int(sweep_time + maxtry); flip_scheme)
         state_energy = CUDA_functional !== false ? energy(sa, Array(r.state)) : energy(sa, r.state)
         success = count(x -> x == 0, state_energy)
             
@@ -34,7 +34,8 @@ function evaluate_p_percentage_velocity(tg::TemperatureGradient,
         success / nbatch < p ? sweep_time += maxtry : nothing
         maxtry /= 2
     end
-    return sweep_time
+    final_sweep_time = sweep_time + 1
+    return (2*SurfaceProgrammableMaterial.cutoff_distance(tg) + m) / (final_sweep_time - 1)
 end
 
 # epsilon determines the lowest_temperature
@@ -42,10 +43,10 @@ end
 function __main__(typetemp::Type, n::Int, m::Int, nbatch::Int; Tmax=2.0, epsilon=1e-5, width=1.0)
     lowest_temperature = -1/log(epsilon)
     tg = typetemp(Tmax, width, lowest_temperature)
-    sweep_time = evaluate_p_percentage_velocity(tg, n, m, nbatch, 0.50; 
+    moving_speed = evaluate_p_percentage_velocity(tg, n, m, nbatch, 0.50; 
                     CUDA_functional = true, flip_scheme = CUDA.cu.(parallel_scheme(SimulatedAnnealingHamiltonian(n, m, CellularAutomata1D(110)))))
-    @show sweep_time
+    @show moving_speed
 end
 
-CUDA.device!(2)
-__main__(SigmoidGradient, 20, 20, 1000)
+CUDA.device!(1)
+__main__(SigmoidGradient, 20, 20, 10000)

@@ -147,15 +147,21 @@ if CUDA.functional()
     @testset "pulse_equilibration_gpu" begin
         CUDA.device!(1)
         sa = SimulatedAnnealingHamiltonian(20, 20, CellularAutomata1D(110))
-        nbatch = 200
-        annealing_time = 4000
+        nbatch = 2000
+        annealing_time = 520
     
-        eg = SigmoidGradient(2.0, 1.0, 1e-5)
+        eg = SigmoidGradient(2.0, 1.0, -1 / log(1e-5))
         r_cpu = SARuntime(Float64, sa, nbatch)
         track_equilibration_pulse!(r_cpu, eg, annealing_time; flip_scheme = 1:nspin(sa))
         state_energy_cpu = energy(sa, r_cpu.state)
         success_cpu = count(x -> x == 0, state_energy_cpu)
         @show success_cpu / nbatch
+
+        r_gpu_parallel = CUDA.cu(r_cpu)
+        track_equilibration_pulse!(r_gpu_parallel, eg, annealing_time; flip_scheme = CUDA.cu.(parallel_scheme(sa)))
+        state_energy_gpu_parallel = energy(sa, Array(r_gpu_parallel.state))
+        success_gpu_parallel = count(x -> x == 0, state_energy_gpu_parallel)
+        @show success_gpu_parallel / nbatch
 
         r_gpu = CUDA.cu(r_cpu)
         track_equilibration_pulse!(r_gpu, eg, annealing_time; flip_scheme = 1:nspin(sa))
@@ -165,11 +171,6 @@ if CUDA.functional()
 
         @test abs((success_cpu / nbatch) - (success_gpu / nbatch)) <= 0.05
 
-        r_gpu_parallel = CUDA.cu(r_cpu)
-        track_equilibration_pulse!(r_gpu_parallel, eg, annealing_time; flip_scheme = CUDA.cu.(parallel_scheme(sa)))
-        state_energy_gpu_parallel = energy(sa, Array(r_gpu_parallel.state))
-        success_gpu_parallel = count(x -> x == 0, state_energy_gpu_parallel)
-        @show success_gpu_parallel / nbatch
         @show success_cpu, success_gpu, success_gpu_parallel
         @test abs((success_gpu_parallel / nbatch) - (success_gpu / nbatch)) <= 0.05
     end
