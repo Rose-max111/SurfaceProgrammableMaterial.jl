@@ -1,12 +1,15 @@
-JL = julia --project=..
+JL = julia 
 
-device ?= 0
-width ?= 12
-depth ?= 10
-gradient ?= 1.5
-gauss_width ?= 1.0
+temperature_type ?= SigmoidGradient
+n ?= 16
+nbatch ?= 10000
+width ?= 0.06
+m_step ?= 9
+m_minimum ?= 18
+m_maximum ?= 300
+device ?= 1
 
 calculate:
-	$(JL) toymodel_genearalannealing.jl $(width) $(depth) $(gauss_width) $(gradient) $(device)
+	$(JL) datato50.jl $(temperature_type) $(n) $(nbatch) $(width) $(m_step) $(m_minimum) $(m_maximum) $(device)
 
 .PHONY: calculate

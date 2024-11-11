@@ -48,5 +48,27 @@ function __main__(typetemp::Type, n::Int, m::Int, nbatch::Int; Tmax=2.0, epsilon
     @show moving_speed
 end
 
-CUDA.device!(1)
-__main__(SigmoidGradient, 20, 20, 10000)
+function __makefilemain__()
+    temperature_type = eval(Symbol(ARGS[1]))
+    n = parse(Int, ARGS[2])
+    nbatch = parse(Int, ARGS[3])
+    width = parse(Float64, ARGS[4])
+    m_step = parse(Int, ARGS[5])
+    m_minimum = parse(Int, ARGS[6])
+    m_maximum = parse(Int, ARGS[7])
+    cuda_device = parse(Int, ARGS[8])
+
+    CUDA.device!(cuda_device)
+    for m in m_minimum:m_step:m_maximum
+        velocity = __main__(temperature_type, n, m, nbatch; width)
+        filepath = joinpath(@__DIR__, "data_$(temperature_type)/n=$(n)_m=$(m)_width=$(width)_nbatch=$(nbatch).txt")
+        open(filepath, "w") do file
+            println(file, velocity)
+        end
+    end
+end
+
+__makefilemain__()
+
+# CUDA.device!(1)
+# __main__(SigmoidGradient, 20, 20, 10000)
