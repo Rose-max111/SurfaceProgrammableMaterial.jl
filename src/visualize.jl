@@ -1,3 +1,3 @@
 function show_temperature_matrix end
 function animate_tracker end
-function temperature_curve end
+function show_temperature_curve end

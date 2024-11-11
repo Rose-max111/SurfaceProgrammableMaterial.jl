@@ -38,7 +38,7 @@ function SurfaceProgrammableMaterial.animate_tracker(sa::SimulatedAnnealingHamil
     @info "Video saved to: $filename"
 end
 
-function SurfaceProgrammableMaterial.temperature_curve(tg::TemperatureGradient, minimum_distance::Real, maximum_distance::Real)
+function SurfaceProgrammableMaterial.show_temperature_curve(tg::TemperatureGradient, minimum_distance::Real, maximum_distance::Real)
     x = range(minimum_distance, maximum_distance, length=500)
     y = [evaluate_temperature(tg, i) for i in x]
     fig = Figure()
