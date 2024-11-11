@@ -28,7 +28,7 @@ export parallel_scheme
 export query_model, nspin, ground_state, IsingGadget
 
 # Visualize method
-export show_temperature_matrix, animate_tracker, temperature_curve
+export show_temperature_matrix, animate_tracker, show_temperature_curve
 
 include("superstruct.jl")
 include("basicgate.jl")
