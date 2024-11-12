@@ -141,12 +141,11 @@ function update_temperature!(runtime::SARuntime, temprule::ColumnWiseGradient, t
     sa = runtime.hamiltonian
     each_movement = (dcut * 2 + sa.m) / (annealing_time - 1)
     middle_position = reverse_direction ? sa.m + dcut - t * each_movement : -dcut + t * each_movement
-    temperature_matrix!(reshape(view(runtime.temperature, :, 1), sa.n, sa.m), temprule, sa, middle_position)
+    temperature_matrix!(reshape(view(runtime.temperature, :, 1), sa.n, sa.m), temprule, 1:sa.m, middle_position)
     view(runtime.temperature, :, 2:size(runtime.temperature, 2)) .= view(runtime.temperature, :, 1:1)
 end
-function update_temperature! end
-function temperature_matrix!(output::AbstractMatrix, tg::ColumnWiseGradient, sa::SimulatedAnnealingHamiltonian, middle_position::Real)
-    offsets = _match_device(output, 1:sa.m)
+function temperature_matrix!(output::AbstractMatrix, tg::ColumnWiseGradient, offsets::AbstractArray, middle_position::Real)
+    offsets = _match_device(output, offsets)
     t = evaluate_temperature.(Ref(tg), offsets .- middle_position)
     output .= reshape(t, 1, :)  # broadcast assignment
 end
