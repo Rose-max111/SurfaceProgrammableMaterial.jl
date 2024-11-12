@@ -4,7 +4,7 @@ using SurfaceProgrammableMaterial: evaluate_temperature
 
 function SurfaceProgrammableMaterial.show_temperature_matrix(tg::TemperatureGradient, sa::SimulatedAnnealingHamiltonian, middle_position::Real)
     tm = zeros(sa.n, sa.m)
-    SurfaceProgrammableMaterial.temperature_matrix!(tm, tg, sa, middle_position)
+    SurfaceProgrammableMaterial.temperature_matrix!(tm, tg, 1:sa.m, middle_position)
     f = Figure(size = (600, sa.n/sa.m*600))
     ax = Axis(f[1, 1], aspect = sa.m/sa.n, xlabel = "time", ylabel = "space")
     image!(ax, tm')
