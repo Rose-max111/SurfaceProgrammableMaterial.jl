@@ -6,6 +6,17 @@ struct IsingModel{ET}
 end
 nspin(model::IsingModel) = model.nspin
 
+function IsingModel(coupling::Matrix{T}) where T # Here assume coupling[i, i] = 0 ∀ i
+    nspin = size(coupling, 1)
+    model = IsingModel{T}(nspin, zeros(Int, nspin), zeros(T, nspin * (nspin - 1), 4), zeros(T, nspin))
+    nedges_already_constructed = 0
+    for i in 1:nspin, j in i+1:nspin
+        nedges_already_constructed = add_interaction!(model, i, j, coupling[i, j], nedges_already_constructed)
+    end
+    @assert nedges_already_constructed == nspin * (nspin - 1) "must construct all edges"
+    return model
+end
+
 function energy(model::IsingModel, state::AbstractArray)
     ret = 0
     for i in 1:2:size(model.interactions, 1)
@@ -92,6 +103,9 @@ function SpinSARuntime(::Type{T}, sa::SimulatedAnnealingHamiltonian{ET}, nbatch:
     model = spin_model_construction(T, sa)
     return SpinSARuntime(sa, model, random_state(model, nbatch), ones(T, model.nspin, nbatch))
 end
+function SpinSARuntime(::Type{T}, nbatch::Integer, model::IsingModel{T}) where T
+    return SpinSARuntime(SimulatedAnnealingHamiltonian(0, 0, CellularAutomata1D(0)), model, random_state(model, nbatch), ones(T, model.nspin, nbatch))
+end
 
 @inline function unsafe_energy(state::AbstractMatrix,
                             interactions::AbstractMatrix, onsites::AbstractArray, last_interaction_index::AbstractArray,
@@ -142,6 +156,12 @@ function update_temperature!(runtime::SpinSARuntime, temprule::ColumnWiseGradien
     temperature_matrix!(reshape(view(runtime.temperature, :, 1), sa.n, 2 * sa.m - 1), temprule, vcat(1:2:2*sa.m-1, 2:2:2*(sa.m-1)), middle_position)
     view(runtime.temperature, :, 2:size(runtime.temperature, 2)) .= view(runtime.temperature, :, 1:1)
 end
+
+function update_temperature!(runtime::SpinSARuntime, temp_scale::Vector{Float64}, t::Integer)
+    view(runtime.temperature, :, 1) .= temp_scale[t]
+    view(runtime.temperature, :, 2:size(runtime.temperature, 2)) .= view(runtime.temperature, :, 1:1)
+end
+    
 _flip_match_device(::SpinSARuntime, spins) = spins
 
 
@@ -168,5 +188,26 @@ end
 function step!(runtime::SpinSARuntime, transition_rule::TransitionRule, simutanuous_flip_spins)
     for ibatch in 1:size(runtime.state, 2), spin in simutanuous_flip_spins
         unsafe_step_kernel!(transition_rule, runtime.temperature, runtime.state, runtime.model.interactions, runtime.model.onsites, runtime.model.last_interaction_index, ibatch, spin)
+    end
+end
+
+function track_equilibration_plane!(
+                runtime::SpinSARuntime,
+                temp_scale::Vector{Float64},
+                num_update_each_temp::Int;
+                tracker = nothing,
+                flip_scheme = 1:nspin(runtime.model),
+                transition_rule::TransitionRule = HeatBath()
+            )
+    @show transition_rule
+    for t in 1:length(temp_scale)
+        @show t
+        update_temperature!(runtime, temp_scale, t)
+        for m in 1:num_update_each_temp
+            # @show t, m
+            for spins in flip_scheme
+                step!(runtime, transition_rule, _flip_match_device(runtime, spins))
+            end
+        end
     end
 end

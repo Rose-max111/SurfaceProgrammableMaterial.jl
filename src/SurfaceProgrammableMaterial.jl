@@ -31,7 +31,7 @@ export query_model, nspin, ground_state, IsingGadget
 export show_temperature_matrix, animate_tracker, show_temperature_curve
 
 # Spin model
-export IsingModel, spin_model_construction, SpinSARuntime
+export IsingModel, spin_model_construction, SpinSARuntime, track_equilibration_plane!
 export spin_to_bool, bool_to_spin
 
 include("superstruct.jl")

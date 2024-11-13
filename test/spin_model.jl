@@ -1,4 +1,4 @@
-using Test, SurfaceProgrammableMaterial
+using Test, SurfaceProgrammableMaterial, DelimitedFiles
 using SurfaceProgrammableMaterial:spin_model_construction
 using SurfaceProgrammableMaterial: unsafe_energy, unsafe_energy_temperature
 using SurfaceProgrammableMaterial: update_temperature!
@@ -102,4 +102,43 @@ end
    success = count(x -> x == -11 * (sa.n * (sa.m-1)), state_energy)
    @show success
 #    @show state_energy
+end
+
+function load_coupling(filename::String)
+    data = readdlm(filename)
+    is = Int.(view(data, :, 1)) .+ 1  #! @. means broadcast for the following functions, is here used correctly?
+    js = Int.(view(data, :, 2)) .+ 1
+    weights = data[:,3]
+    num_spin = max(maximum(is), maximum(js))
+    J = zeros(eltype(weights), num_spin, num_spin)
+    @inbounds for (i, j, weight) = zip(is, js, weights)
+        J[i,j] = weight
+        J[j,i] = weight
+    end
+    return IsingModel(J)
+end
+
+@testset "simulated annealing via externel_std" begin
+    model = load_coupling("test/externel_std/80_example.txt")
+    # @test model.nspin == 300
+    # @test model.interactions[1, :] == [1, 2, 1, 0]
+    # @test model.interactions[2, :] == [2, 1, 1, 0]
+    # @test model.interactions[3, :] == [1, 3, 1, 1]
+    # @test model.interactions[4, :] == [3, 1, 1, 0]
+
+    temp_scales = 10 .- (1:64 .- 1) .* 0.15 |> collect
+    r = SpinSARuntime(Float64, 30, model)
+    track_equilibration_plane!(r, temp_scales, 100; transition_rule = Metropolis())
+    state_energy = energy(r.model, r.state)
+    @show state_energy, minimum(state_energy)
+    @test minimum(state_energy) == -498
+
+    model = load_coupling("test/externel_std/100_example.txt")
+    
+    temp_scales = 10 .- (1:64 .- 1) .* 0.15 |> collect
+    r = SpinSARuntime(Float64, 30, model)
+    track_equilibration_plane!(r, temp_scales, 50; transition_rule = Metropolis())
+    state_energy = energy(r.model, r.state)
+    @show state_energy, minimum(state_energy)
+    @test minimum(state_energy) == -746
 end
