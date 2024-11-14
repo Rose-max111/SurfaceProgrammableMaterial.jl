@@ -1,4 +1,4 @@
-using Test, SurfaceProgrammableMaterial, DelimitedFiles
+using Test, SurfaceProgrammableMaterial, DelimitedFiles, CUDA
 using SurfaceProgrammableMaterial:spin_model_construction
 using SurfaceProgrammableMaterial: unsafe_energy, unsafe_energy_temperature
 using SurfaceProgrammableMaterial: update_temperature!
@@ -181,9 +181,9 @@ end
 if CUDA.functional()
     @testset "spin_model_pulse_equilibration_gpu" begin
         CUDA.device!(1)
-        sa = SimulatedAnnealingHamiltonian(5, 5, CellularAutomata1D(110))
+        sa = SimulatedAnnealingHamiltonian(7, 5, CellularAutomata1D(110))
         nbatch = 1000
-        annealing_time = 1050
+        annealing_time = 2050
     
         eg = SigmoidGradient(40.0, 3.0, 1e-5)
         r_cpu = SpinSARuntime(Float64, sa, nbatch)
