@@ -53,11 +53,11 @@ function SurfaceProgrammableMaterial.step!(runtime::SpinSARuntime{T, ET, <:CuMat
     end
 
     # launch the kernel
-    kernel = @cuda launch=false kernel(transition_rule, runtime.temperature, runtime.state, runtime.interactions, runtime.onsites, runtime.last_interaction_index, simutanuous_flip_spins)
+    kernel = @cuda launch=false kernel(transition_rule, runtime.temperature, runtime.state, runtime.model.interactions, runtime.model.onsites, runtime.model.last_interaction_index, simutanuous_flip_spins)
     config = launch_configuration(kernel.fun)
     threads = min(n, config.threads)
     blocks = cld(n, threads)
-    CUDA.@sync kernel(transition_rule, runtime.temperature, runtime.state, runtime.interactions, runtime.onsites, runtime.last_interaction_index, simutanuous_flip_spins; threads, blocks)
+    CUDA.@sync kernel(transition_rule, runtime.temperature, runtime.state, runtime.model.interactions, runtime.model.onsites, runtime.model.last_interaction_index, simutanuous_flip_spins; threads, blocks)
 end
 
 

@@ -113,7 +113,7 @@ end
     last_interaction = last_interaction_index[inode]
     energy = state[inode, ibatch] == true ? onsites[inode] : -onsites[inode]
     while last_interaction != 0
-        interaction = interactions[last_interaction, :]
+        interaction = @view interactions[last_interaction, :]
         last_interaction = Int(interaction[4])
         energy += state[Int(interaction[1]), ibatch] ⊻ state[Int(interaction[2]), ibatch] ? -interaction[3] : interaction[3]
     end
@@ -126,7 +126,7 @@ end
     last_interaction = last_interaction_index[inode]
     ret = state[inode, ibatch] == true ? onsites[inode] / temperature[inode, ibatch] : -onsites[inode] / temperature[inode, ibatch]
     while last_interaction != 0
-        interaction = interactions[last_interaction, :]
+        interaction = @view interactions[last_interaction, :]
         last_interaction = Int(interaction[4])
         energy = state[Int(interaction[1]), ibatch] ⊻ state[Int(interaction[2]), ibatch] ? -interaction[3] : interaction[3]
         ret += energy / sqrt(temperature[Int(interaction[1]), ibatch] * temperature[Int(interaction[2]), ibatch])

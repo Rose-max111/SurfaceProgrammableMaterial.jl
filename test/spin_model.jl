@@ -1,4 +1,4 @@
-using Test, SurfaceProgrammableMaterial, DelimitedFiles
+using Test, SurfaceProgrammableMaterial, DelimitedFiles, CUDA
 using SurfaceProgrammableMaterial:spin_model_construction
 using SurfaceProgrammableMaterial: unsafe_energy, unsafe_energy_temperature
 using SurfaceProgrammableMaterial: update_temperature!
@@ -158,22 +158,62 @@ end
 if CUDA.functional()
     @testset "spin_model_pulse_equilibration_gpu" begin
         CUDA.device!(1)
-        sa = SimulatedAnnealingHamiltonian(6, 6, CellularAutomata1D(110))
+        sa = SimulatedAnnealingHamiltonian(5, 5, CellularAutomata1D(110))
         nbatch = 1000
         annealing_time = 1050
     
         eg = SigmoidGradient(40.0, 3.0, 1e-5)
         r_cpu = SpinSARuntime(Float64, sa, nbatch)
 
-        track_equilibration_pulse!(r, eg, annealing_time; flip_scheme = 1:nspin(r.model))
-        state_energy = energy(r.model, r.state)
+        track_equilibration_pulse!(r_cpu, eg, annealing_time; flip_scheme = 1:nspin(r_cpu.model))
+        state_energy = energy(r_cpu.model, r_cpu.state)
         success = count(x -> x == -11 * (sa.n * (sa.m-1)), state_energy)
         @show success
 
         r_gpu = CUDA.cu(SpinSARuntime(Float64, sa, nbatch))
-        track_equilibration_pulse!(r_gpu, eg, annealing_time; flip_scheme = 1:nspin(r.model))
-        state_energy_gpu = energy(sa, Array(r_gpu.state))
-        success_gpu = count(x -> x == 0, state_energy_gpu)
+        track_equilibration_pulse!(r_gpu, eg, annealing_time; flip_scheme = 1:nspin(r_gpu.model))
+        state_energy_gpu = energy(r_cpu.model, Array(r_gpu.state))
+        success_gpu = count(x -> x == -11 * (sa.n * (sa.m-1)), state_energy_gpu)
         @show success_gpu
+
+        @show (success / nbatch, success_gpu / nbatch)
+        @test abs(success / nbatch - success_gpu / nbatch) <=0.05
+    end
+    
+    @testset "GPU vs std" begin
+        # test 80 spins
+        model = load_coupling("test/externel_std/80_example.txt")
+
+        temp_scales = 10 .- (1:64 .- 1) .* 0.15 |> collect
+        r = CUDA.cu(SpinSARuntime(Float64, 30, model))
+        track_equilibration_plane!(r, temp_scales, 100; transition_rule = Metropolis())
+        state_energy = energy(model, Array(r.state))
+        @show state_energy, minimum(state_energy)
+        @test minimum(state_energy) == -498
+
+        # test 100 spins
+        model = load_coupling("test/externel_std/100_example.txt")
+        
+        temp_scales = 10 .- (1:64 .- 1) .* 0.15 |> collect
+        r = CUDA.cu(SpinSARuntime(Float64, 30, model))
+        track_equilibration_plane!(r, temp_scales, 50; transition_rule = Metropolis())
+        state_energy = energy(model, Array(r.state))
+        @show state_energy, minimum(state_energy)
+        @test minimum(state_energy) == -746
+
+        # Please test following code on github CI
+        # model = load_coupling("test/externel_std/example.txt")
+        # @test model.nspin == 300
+        # @test model.interactions[1, :] == [1, 2, 1, 0]
+        # @test model.interactions[2, :] == [2, 1, 1, 0]
+        # @test model.interactions[3, :] == [1, 3, 1, 1]
+        # @test model.interactions[4, :] == [3, 1, 1, 0]
+        
+        # temp_scales = 10 .- (1:64 .- 1) .* 0.15 |> collect
+        # r = CUDA.cu(SpinSARuntime(Float64, 30, model))
+        # track_equilibration_plane!(r, temp_scales, 2000; transition_rule = Metropolis())
+        # state_energy = energy(r.model, Array(r.state))
+        # @show state_energy, minimum(state_energy)
+        # @test minimum(state_energy) == -3858
     end
 end
