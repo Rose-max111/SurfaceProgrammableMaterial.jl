@@ -39,7 +39,19 @@ using SurfaceProgrammableMaterial: update_temperature!
     end
 end
 
-function unsafe_total_energy(model::IsingModel, states::AbstractArray)
+if CUDA.functional()
+    @testset "energy" begin
+        model = spin_model_construction(Float64, SimulatedAnnealingHamiltonian(12, 8, CellularAutomata1D(110), true))
+        states = spin_to_bool(rand([-1, 1], model.nspin))
+        energy_cpu = energy(model, reshape(states, :, 1))[1]
+        states_gpu = CuArray(reshape(states, :, 1))
+        energy_gpu = energy(model, states_gpu)[1]
+        @show energy_cpu, energy_gpu
+        @test energy_cpu == energy_gpu
+    end
+end
+
+function unsafe_total_energy(model::IsingModel, states::AbstractMatrix)
     ret = zeros(Float64, size(states, 2))
     for inode in 1:model.nspin
         for ibatch in 1:size(states, 2)
@@ -51,7 +63,7 @@ function unsafe_total_energy(model::IsingModel, states::AbstractArray)
     return ret ./ 2
 end
 
-function unsafe_total_energy_temperature(model::IsingModel, states::AbstractArray)
+function unsafe_total_energy_temperature(model::IsingModel, states::AbstractMatrix)
     ret = zeros(Float64, size(states, 2))
     for inode in 1:model.nspin
         for ibatch in 1:size(states, 2)
@@ -75,6 +87,9 @@ end
         @test unsafe_total_energy(model, reshape(states, :, 1))[1] == energy(model, states)
     end
 end
+
+
+
 
 @testset "unsafe_energy_temperature" begin
     model = spin_model_construction(Float64, SimulatedAnnealingHamiltonian(4, 2, CellularAutomata1D(110), false))

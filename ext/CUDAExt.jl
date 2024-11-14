@@ -60,5 +60,35 @@ function SurfaceProgrammableMaterial.step!(runtime::SpinSARuntime{T, ET, <:CuMat
     CUDA.@sync kernel(transition_rule, runtime.temperature, runtime.state, runtime.model.interactions, runtime.model.onsites, runtime.model.last_interaction_index, simutanuous_flip_spins; threads, blocks)
 end
 
+function energy_kernel!(interactions::AbstractMatrix, state::AbstractMatrix, energy::AbstractArray, ibatch, iinter)
+    sx, sy = state[Int(interactions[iinter, 1]), ibatch], state[Int(interactions[iinter, 2]), ibatch]
+    energy[ibatch] += sx ⊻ sy ? -interactions[iinter, 3] : interactions[iinter, 3]
+end
+
+function SurfaceProgrammableMaterial.energy(model::IsingModel, state::CuMatrix{Bool})
+    ret = CuArray(zeros(size(state, 2)))
+    interactions = CuArray(model.interactions)
+    onsites = CuArray(model.onsites)
+    n = size(state, 2)
+    @inline function kernel(interactions::AbstractMatrix, onsites::AbstractArray, state::AbstractMatrix, energy::AbstractArray, nspin::Integer)
+        idx = (blockIdx().x - Int32(1)) * blockDim().x + threadIdx().x
+        idx > n && return nothing
+        for iinter in 1:2:size(interactions, 1)
+            energy_kernel!(interactions, state, energy, idx, iinter)
+        end
+        for ispin in 1:nspin
+            energy[idx] += state[ispin, idx] ? onsites[ispin] : -onsites[ispin]
+        end
+        return nothing
+    end
+
+    kernel = @cuda launch=false kernel(interactions, onsites, state, ret, model.nspin)
+    config = launch_configuration(kernel.fun)
+    threads = min(n, config.threads)
+    blocks = cld(n, threads)
+    CUDA.@sync kernel(interactions, onsites, state, ret, model.nspin; threads, blocks)
+    
+    return Array(ret)
+end
 
 end
