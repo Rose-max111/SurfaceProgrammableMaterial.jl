@@ -154,3 +154,26 @@ end
     @show state_energy, minimum(state_energy)
     @test minimum(state_energy) == -3858
 end
+
+if CUDA.functional()
+    @testset "spin_model_pulse_equilibration_gpu" begin
+        CUDA.device!(1)
+        sa = SimulatedAnnealingHamiltonian(6, 6, CellularAutomata1D(110))
+        nbatch = 1000
+        annealing_time = 1050
+    
+        eg = SigmoidGradient(40.0, 3.0, 1e-5)
+        r_cpu = SpinSARuntime(Float64, sa, nbatch)
+
+        track_equilibration_pulse!(r, eg, annealing_time; flip_scheme = 1:nspin(r.model))
+        state_energy = energy(r.model, r.state)
+        success = count(x -> x == -11 * (sa.n * (sa.m-1)), state_energy)
+        @show success
+
+        r_gpu = CUDA.cu(SpinSARuntime(Float64, sa, nbatch))
+        track_equilibration_pulse!(r_gpu, eg, annealing_time; flip_scheme = 1:nspin(r.model))
+        state_energy_gpu = energy(sa, Array(r_gpu.state))
+        success_gpu = count(x -> x == 0, state_energy_gpu)
+        @show success_gpu
+    end
+end
