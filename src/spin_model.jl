@@ -164,6 +164,11 @@ end
     
 _flip_match_device(::SpinSARuntime, spins) = spins
 
+# Note the following parallel scheme only works for cellular automata 110 encoding
+function parallel_scheme(runtime::SpinSARuntime)
+    ret = parallel_scheme(runtime.hamiltonian)
+    return vcat(ret, [collect(runtime.hamiltonian.n * runtime.hamiltonian.m +1:runtime.model.nspin)])
+end
 
 function track_equilibration_pulse!(
                 runtime::SpinSARuntime,
