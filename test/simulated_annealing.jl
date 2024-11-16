@@ -116,6 +116,14 @@ end
             test_flip_id(sa)
         end
     end
+    for n in 3:12
+        for m in 3:12
+            sa = SimulatedAnnealingHamiltonian(n, m, CellularAutomata1D(110))
+            flip = parallel_scheme(sa; input_fixed = true)
+            @test sort!(vcat(flip...)) == collect(sa.n+1:sa.n*sa.m)
+        end
+    end
+    @show parallel_scheme(SimulatedAnnealingHamiltonian(4, 4, CellularAutomata1D(110)); input_fixed = true)
 end
 
 @testset "pulse_equilibration_cpu" begin
