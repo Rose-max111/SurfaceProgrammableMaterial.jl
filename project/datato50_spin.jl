@@ -12,9 +12,7 @@ function evaluate_p_percentage_velocity(tg::TemperatureGradient,
         r = SpinSARuntime(Float64, sa, nbatch)
         CUDA_functional == true ? (r = CUDA.cu(r)) : nothing
 
-        @info "begin annealing"
-        track_equilibration_pulse!(r, tg, maxtry; flip_scheme)
-        @info "finish annealing"
+        @time track_equilibration_pulse!(r, tg, maxtry; flip_scheme)
         state_energy = energy(model, r.state)
         @show state_energy[1]
         success = count(x -> x == -11 * n * (m-1), state_energy)
@@ -28,7 +26,7 @@ function evaluate_p_percentage_velocity(tg::TemperatureGradient,
         r = SpinSARuntime(Float64, sa, nbatch)
         CUDA_functional == true ? (r = CUDA.cu(r)) : nothing
 
-        track_equilibration_pulse!(r, tg, Int(sweep_time + maxtry); flip_scheme)
+        @time track_equilibration_pulse!(r, tg, Int(sweep_time + maxtry); flip_scheme)
         state_energy = energy(model, r.state)
         success = count(x -> x == -11 * n * (m-1), state_energy)
             
@@ -43,7 +41,7 @@ end
 
 # epsilon determines the lowest_temperature
 # Tmax denote the highest_temperature
-function __main__(typetemp::Type, n::Int, m::Int, nbatch::Int; Tmax=20.0, epsilon=1e-5, width=1.0)
+function __main__(typetemp::Type, n::Int, m::Int, nbatch::Int; Tmax=30.0, epsilon=1e-5, width=1.0)
     lowest_temperature = -1/log(epsilon)
     tg = typetemp(Tmax, width, lowest_temperature)
     sa = SimulatedAnnealingHamiltonian(n, m, CellularAutomata1D(110))
@@ -73,7 +71,7 @@ function __makefilemain__()
     end
 end
 
-# __makefilemain__()
+__makefilemain__()
 
-CUDA.device!(1)
-__main__(SigmoidGradient, 10, 10, 10000)
+# CUDA.device!(1)
+# __main__(SigmoidGradient, 10, 10, 10000)
