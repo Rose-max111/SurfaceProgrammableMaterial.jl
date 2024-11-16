@@ -1,6 +1,12 @@
 using CairoMakie
 using CurveFit
 
+struct Data
+    x::Vector{Float64}
+    y::Vector{Float64}
+end
+Data(x::Vector{Int}, y::Vector{Float64}) = Data(Float64.(x), y)
+
 function read_data(expect_width::Float64)
     file_names = readdir("project/data_SigmoidGradient")
     file_data = []
@@ -15,27 +21,44 @@ function read_data(expect_width::Float64)
     sort!(file_data, by=x->x[1])
     x_data = [x[1] for x in file_data]
     y_data = [x[2] for x in file_data]
-    return x_data, y_data
-end
-function plot_data!(ax::Axis, x_data::Vector{Float64}, y_data::Vector{Float64}, this_label::String)
-    scatter!(ax, x_data, y_data, label = this_label)
-    # fit_y = curve_fit(LinearFit, Float64.(x_data), y_data)
-    # lines!(ax, x_data, fit_y.(Float64.(x_data)))
+    return Data(x_data, y_data)
 end
 
-fig = Figure(size=(600, 600))
-ax = Axis(fig[1, 1], xscale = log, yscale = log, title = "moving velocity v.s. depth(SigmoidGradient)", xlabel = "depth", ylabel = "1 / velocity",
+function power_vs_width(widths::Vector{Float64})
+    y_data = Vector{Float64}()
+    for expect_width in widths
+        data = read_data(expect_width)
+        fit = fitting(Data(log.(data.x), log.(data.y)))
+        power = fit.coefs[2]
+        push!(y_data, power)
+    end
+    return Data(widths, y_data)
+end
+
+fitting(data::Data) = curve_fit(LinearFit, data.x, data.y)
+
+function plot_data!(ax::Axis, data::Data, this_label::String)
+    scatter!(ax, data.x, data.y, label = this_label)
+end
+
+my_widths = [1.3, 1.0, 0.8, 0.6, 0.3, 0.2, 0.1, 0.06, 0.03]
+data_power_width = power_vs_width(my_widths)
+
+fig = Figure(size=(1200, 600))
+ax2 = Axis(fig[1, 2], xlabel = "width", ylabel = "slope", title = "slope v.s. width")
+ax1 = Axis(fig[1, 1], xscale = log, yscale = log, title = "moving velocity v.s. depth(SigmoidGradient)", xlabel = "depth", ylabel = "velocity",
     # xticks = ([exp(i) for i in 2:5], ["exp($i)" for i in 2:5]),
     # yticks = ([exp(i) for i in -1:5], ["exp($i)" for i in -1:5]),
     aspect = 0.75
 )
-for expect_width in [1.0, 0.6, 0.3, 0.1, 0.06]
-    x_data, y_data = read_data(expect_width)
-    y_data = 1.0 ./ y_data
-    x_data = Float64.(x_data)
-    plot_data!(ax, x_data, y_data, "Width = $expect_width")
+for id in 1:length(my_widths)
+    data = read_data(my_widths[id])
+    scatter!(ax1, data.x, data.y, label = "width=$(my_widths[id])")
+    scatter!(ax2, [my_widths[id]], [data_power_width.y[id]])
 end
-axislegend(ax; position = :lt)
+
+
+axislegend(ax1; position = :lb)
 fig
 
 # using SurfaceProgrammableMaterial
