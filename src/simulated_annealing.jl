@@ -100,7 +100,7 @@ end
     @inbounds sa.periodic ? (lis[mod1(i-1, sa.n), j+1], lis[mod1(i, sa.n), j+1], lis[mod1(i+1, sa.n), j+1]) : (lis[i-1, j+1], lis[i, j+1], lis[i+1, j+1])
 end
 
-function parallel_scheme(sa::SimulatedAnnealingHamiltonian{<:CellularAutomata1D})
+function parallel_scheme(sa::SimulatedAnnealingHamiltonian{<:CellularAutomata1D}; input_fixed=false)
     ret = Vector{Vector{Int}}()
     for cnt in 1:6
         temp = Vector{Int}()
@@ -118,6 +118,10 @@ function parallel_scheme(sa::SimulatedAnnealingHamiltonian{<:CellularAutomata1D}
     if sa.n % 3 >= 2
         push!(ret, collect(sa.n-1:2*sa.n:sa.n*sa.m))
         push!(ret, collect(2*sa.n-1:2*sa.n:sa.n*sa.m))
+    end
+    input_fixed == false && return ret
+    for i in 1:length(ret)
+        ret[i] = setdiff(ret[i], collect(1:sa.n))
     end
     return ret
 end
