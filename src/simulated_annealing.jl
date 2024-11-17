@@ -100,7 +100,7 @@ end
     @inbounds sa.periodic ? (lis[mod1(i-1, sa.n), j+1], lis[mod1(i, sa.n), j+1], lis[mod1(i+1, sa.n), j+1]) : (lis[i-1, j+1], lis[i, j+1], lis[i+1, j+1])
 end
 
-function parallel_scheme(sa::SimulatedAnnealingHamiltonian{<:CellularAutomata1D})
+function parallel_scheme(sa::SimulatedAnnealingHamiltonian{<:CellularAutomata1D}; input_fixed=false)
     ret = Vector{Vector{Int}}()
     for cnt in 1:6
         temp = Vector{Int}()
@@ -118,6 +118,10 @@ function parallel_scheme(sa::SimulatedAnnealingHamiltonian{<:CellularAutomata1D}
     if sa.n % 3 >= 2
         push!(ret, collect(sa.n-1:2*sa.n:sa.n*sa.m))
         push!(ret, collect(2*sa.n-1:2*sa.n:sa.n*sa.m))
+    end
+    input_fixed == false && return ret
+    for i in 1:length(ret)
+        ret[i] = setdiff(ret[i], collect(1:sa.n))
     end
     return ret
 end
@@ -141,12 +145,11 @@ function update_temperature!(runtime::SARuntime, temprule::ColumnWiseGradient, t
     sa = runtime.hamiltonian
     each_movement = (dcut * 2 + sa.m) / (annealing_time - 1)
     middle_position = reverse_direction ? sa.m + dcut - t * each_movement : -dcut + t * each_movement
-    temperature_matrix!(reshape(view(runtime.temperature, :, 1), sa.n, sa.m), temprule, sa, middle_position)
+    temperature_matrix!(reshape(view(runtime.temperature, :, 1), sa.n, sa.m), temprule, 1:sa.m, middle_position)
     view(runtime.temperature, :, 2:size(runtime.temperature, 2)) .= view(runtime.temperature, :, 1:1)
 end
-function update_temperature! end
-function temperature_matrix!(output::AbstractMatrix, tg::ColumnWiseGradient, sa::SimulatedAnnealingHamiltonian, middle_position::Real)
-    offsets = _match_device(output, 1:sa.m)
+function temperature_matrix!(output::AbstractMatrix, tg::ColumnWiseGradient, offsets::AbstractArray, middle_position::Real)
+    offsets = _match_device(output, offsets)
     t = evaluate_temperature.(Ref(tg), offsets .- middle_position)
     output .= reshape(t, 1, :)  # broadcast assignment
 end
@@ -163,7 +166,7 @@ function track_equilibration_pulse!(
                 reverse_direction::Bool=false
             )
     sa = runtime.hamiltonian
-    @assert all(sort!(vcat(flip_scheme...)) .== 1:nspin(sa)) "invalid flip scheme: $flip_scheme, must be a perfect cover of all spins: $(1:nspin(sa))"
+    # @assert all(sort!(vcat(flip_scheme...)) .== 1:nspin(sa)) "invalid flip scheme: $flip_scheme, must be a perfect cover of all spins: $(1:nspin(sa))"
 
     update_temperature!(runtime, temprule, 0, annealing_time, reverse_direction)
     tracker !== nothing && track!(tracker, copy(runtime.state), copy(runtime.temperature))

@@ -4,7 +4,7 @@ using SurfaceProgrammableMaterial: evaluate_temperature
 
 function SurfaceProgrammableMaterial.show_temperature_matrix(tg::TemperatureGradient, sa::SimulatedAnnealingHamiltonian, middle_position::Real)
     tm = zeros(sa.n, sa.m)
-    SurfaceProgrammableMaterial.temperature_matrix!(tm, tg, sa, middle_position)
+    SurfaceProgrammableMaterial.temperature_matrix!(tm, tg, 1:sa.m, middle_position)
     f = Figure(size = (600, sa.n/sa.m*600))
     ax = Axis(f[1, 1], aspect = sa.m/sa.n, xlabel = "time", ylabel = "space")
     image!(ax, tm')
@@ -38,7 +38,7 @@ function SurfaceProgrammableMaterial.animate_tracker(sa::SimulatedAnnealingHamil
     @info "Video saved to: $filename"
 end
 
-function SurfaceProgrammableMaterial.temperature_curve(tg::TemperatureGradient, minimum_distance::Real, maximum_distance::Real)
+function SurfaceProgrammableMaterial.show_temperature_curve(tg::TemperatureGradient, minimum_distance::Real, maximum_distance::Real)
     x = range(minimum_distance, maximum_distance, length=500)
     y = [evaluate_temperature(tg, i) for i in x]
     fig = Figure()

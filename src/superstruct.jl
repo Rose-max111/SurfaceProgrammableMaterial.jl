@@ -38,6 +38,9 @@ end
 cutoff_distance(sg::SigmoidGradient) = sg.width * log(sg.high_temperature/sg.low_temperature)
 lowest_temperature(sg::SigmoidGradient) = sg.low_temperature
 
+
+
+
 abstract type TransitionRule end
 struct HeatBath <: TransitionRule end
 prob_accept(::HeatBath, ΔE_over_T::Real) = inv(1 + exp(ΔE_over_T))

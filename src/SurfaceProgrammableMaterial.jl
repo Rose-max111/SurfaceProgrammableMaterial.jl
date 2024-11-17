@@ -28,7 +28,11 @@ export parallel_scheme
 export query_model, nspin, ground_state, IsingGadget
 
 # Visualize method
-export show_temperature_matrix, animate_tracker, temperature_curve
+export show_temperature_matrix, animate_tracker, show_temperature_curve
+
+# Spin model
+export IsingModel, spin_model_construction, SpinSARuntime, track_equilibration_plane!
+export spin_to_bool, bool_to_spin
 
 include("superstruct.jl")
 include("basicgate.jl")
@@ -36,5 +40,6 @@ include("ca1d.jl")
 include("simulated_annealing.jl")
 include("truthtablelp.jl")
 include("visualize.jl")
+include("spin_model.jl")
 
 end

@@ -16,3 +16,7 @@ end
 @testset "visualize" begin
     include("visualize.jl")
 end
+
+@testset "spin_model" begin
+    include("spin_model.jl")
+end
