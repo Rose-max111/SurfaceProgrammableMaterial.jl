@@ -10,6 +10,9 @@ using HiGHS
 # Temperature gradient
 export GaussianGradient, ExponentialGradient, SigmoidGradient, ColumnWiseGradient, TemperatureGradient
 
+# Temperature collective
+export LinearTemperature, TemperatureCollective
+
 # Transition rule
 export TransitionRule, HeatBath, Metropolis
 export SimulatedAnnealingHamiltonian, energy, random_state

@@ -29,6 +29,18 @@ end
     @test SurfaceProgrammableMaterial.lowest_temperature(sg) == 1e-5
 end
 
+
+@testset "temperature collective" begin
+    tl = LinearTemperature(5.0, 1.0)
+    @test SurfaceProgrammableMaterial.evaluate_temperature(tl, 0.0) == 5.0
+    @test SurfaceProgrammableMaterial.evaluate_temperature(tl, 1.0) ≈ 1.0
+    sa = SimulatedAnnealingHamiltonian(6, 7, CellularAutomata1D(110))
+    r = SARuntime(Float64, sa, 10)
+    update_temperature!(r, tl, 5, 10, false)
+    @test r.temperature[1, 1] ≈ 3.0
+    @test r.temperature[1, 10] ≈ 3.0
+end
+
 if CUDA.functional()
     @testset "temperature gradient gpu" begin
         sa = SimulatedAnnealingHamiltonian(8, 12, CellularAutomata1D(110))

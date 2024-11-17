@@ -148,6 +148,12 @@ function update_temperature!(runtime::SARuntime, temprule::ColumnWiseGradient, t
     temperature_matrix!(reshape(view(runtime.temperature, :, 1), sa.n, sa.m), temprule, 1:sa.m, middle_position)
     view(runtime.temperature, :, 2:size(runtime.temperature, 2)) .= view(runtime.temperature, :, 1:1)
 end
+function update_temperature!(runtime::SARuntime, temprule::TemperatureCollective, t::Integer, annealing_time::Integer, reverse_direction::Bool)
+    proportion = t / annealing_time
+    this_temperature = evaluate_temperature(temprule, proportion)
+    view(runtime.temperature, :, 1) .= this_temperature
+    view(runtime.temperature, :, 2:size(runtime.temperature, 2)) .= view(runtime.temperature, :, 1:1)
+end
 function temperature_matrix!(output::AbstractMatrix, tg::ColumnWiseGradient, offsets::AbstractArray, middle_position::Real)
     offsets = _match_device(output, offsets)
     t = evaluate_temperature.(Ref(tg), offsets .- middle_position)
@@ -158,7 +164,7 @@ _flip_match_device(::SARuntime, spins) = spins
 
 function track_equilibration_pulse!(
                 runtime::SARuntime,
-                temprule::TemperatureGradient,
+                temprule::TemperatureRule,
                 annealing_time;
                 tracker = nothing,
                 flip_scheme = 1:nspin(runtime.hamiltonian),

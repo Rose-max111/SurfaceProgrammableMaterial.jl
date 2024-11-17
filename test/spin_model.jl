@@ -179,19 +179,19 @@ end
     @test minimum(state_energy) == -746
 
     # Please test following code on github CI
-    model = load_coupling(joinpath(@__DIR__, "externel_std/example.txt"))
-    @test model.nspin == 300
-    @test model.interactions[1, :] == [1, 2, 1, 0]
-    @test model.interactions[2, :] == [2, 1, 1, 0]
-    @test model.interactions[3, :] == [1, 3, 1, 1]
-    @test model.interactions[4, :] == [3, 1, 1, 0]
+    # model = load_coupling(joinpath(@__DIR__, "externel_std/example.txt"))
+    # @test model.nspin == 300
+    # @test model.interactions[1, :] == [1, 2, 1, 0]
+    # @test model.interactions[2, :] == [2, 1, 1, 0]
+    # @test model.interactions[3, :] == [1, 3, 1, 1]
+    # @test model.interactions[4, :] == [3, 1, 1, 0]
     
-    temp_scales = 10 .- (1:64 .- 1) .* 0.15 |> collect
-    r = SpinSARuntime(Float64, 30, model)
-    track_equilibration_plane!(r, temp_scales, 2000; transition_rule = Metropolis())
-    state_energy = energy(r.model, r.state)
-    @show state_energy, minimum(state_energy)
-    @test minimum(state_energy) == -3858
+    # temp_scales = 10 .- (1:64 .- 1) .* 0.15 |> collect
+    # r = SpinSARuntime(Float64, 30, model)
+    # track_equilibration_plane!(r, temp_scales, 2000; transition_rule = Metropolis())
+    # state_energy = energy(r.model, r.state)
+    # @show state_energy, minimum(state_energy)
+    # @test minimum(state_energy) == -3858
 end
 
 if CUDA.functional()

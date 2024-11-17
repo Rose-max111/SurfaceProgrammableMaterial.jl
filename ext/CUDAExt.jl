@@ -37,6 +37,8 @@ function SurfaceProgrammableMaterial.step!(runtime::SARuntime{T, ET, <:CuMatrix{
     CUDA.@sync kernel(runtime.state, runtime.temperature, runtime.hamiltonian, transition_rule, n, simutanuous_flip_spins; threads, blocks)
 end
 
+# The following part is dispatching for Spin Model
+
 function SurfaceProgrammableMaterial.step!(runtime::SpinSARuntime{T, ET, <:CuMatrix{T}, <:CuMatrix{Bool}} where {T, ET},
             transition_rule::TransitionRule,
             simutanuous_flip_spins::CuVector

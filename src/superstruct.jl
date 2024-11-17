@@ -1,5 +1,7 @@
-abstract type TemperatureGradient end
+abstract type TemperatureRule end
+abstract type TemperatureGradient <: TemperatureRule end
 abstract type ColumnWiseGradient <: TemperatureGradient end
+abstract type TemperatureCollective <: TemperatureRule end
 
 # Gaussian temperature gradient: T(distance) = amplitude * exp(-(distance)^2 / width^2) + lowest_temperature
 struct GaussianGradient <: ColumnWiseGradient
@@ -38,7 +40,13 @@ end
 cutoff_distance(sg::SigmoidGradient) = sg.width * log(sg.high_temperature/sg.low_temperature)
 lowest_temperature(sg::SigmoidGradient) = sg.low_temperature
 
-
+struct LinearTemperature <: TemperatureCollective
+    high_temperature::Float64
+    low_temperature::Float64
+end
+function evaluate_temperature(lt::LinearTemperature, proportion::Real) # proportion in [0, 1]
+    return lt.high_temperature - proportion * (lt.high_temperature - lt.low_temperature)
+end
 
 
 abstract type TransitionRule end
