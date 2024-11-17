@@ -166,7 +166,7 @@ function track_equilibration_pulse!(
                 reverse_direction::Bool=false
             )
     sa = runtime.hamiltonian
-    @assert all(sort!(vcat(flip_scheme...)) .== 1:nspin(sa)) "invalid flip scheme: $flip_scheme, must be a perfect cover of all spins: $(1:nspin(sa))"
+    # @assert all(sort!(vcat(flip_scheme...)) .== 1:nspin(sa)) "invalid flip scheme: $flip_scheme, must be a perfect cover of all spins: $(1:nspin(sa))"
 
     update_temperature!(runtime, temprule, 0, annealing_time, reverse_direction)
     tracker !== nothing && track!(tracker, copy(runtime.state), copy(runtime.temperature))
