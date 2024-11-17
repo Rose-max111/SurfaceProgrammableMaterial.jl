@@ -3,6 +3,7 @@ using SurfaceProgrammableMaterial:spin_model_construction
 using SurfaceProgrammableMaterial: unsafe_energy, unsafe_energy_temperature
 using SurfaceProgrammableMaterial: update_temperature!
 
+
 @testset "construct and energy" begin
     model = spin_model_construction(Float64, SimulatedAnnealingHamiltonian(3, 2, CellularAutomata1D(110), false))
     @test model.nspin == 9
@@ -158,7 +159,7 @@ end
 
 @testset "simulated annealing via externel_std" begin
     # test 80 spins
-    model = load_coupling("test/externel_std/80_example.txt")
+    model = load_coupling(joinpath(@__DIR__, "externel_std/80_example.txt"))
 
     temp_scales = 10 .- (1:64 .- 1) .* 0.15 |> collect
     r = SpinSARuntime(Float64, 30, model)
@@ -168,7 +169,7 @@ end
     @test minimum(state_energy) == -498
 
     # test 100 spins
-    model = load_coupling("test/externel_std/100_example.txt")
+    model = load_coupling(joinpath(@__DIR__, "externel_std/100_example.txt"))
     
     temp_scales = 10 .- (1:64 .- 1) .* 0.15 |> collect
     r = SpinSARuntime(Float64, 30, model)
@@ -178,7 +179,7 @@ end
     @test minimum(state_energy) == -746
 
     # Please test following code on github CI
-    model = load_coupling("test/externel_std/example.txt")
+    model = load_coupling(joinpath(@__DIR__, "externel_std/example.txt"))
     @test model.nspin == 300
     @test model.interactions[1, :] == [1, 2, 1, 0]
     @test model.interactions[2, :] == [2, 1, 1, 0]

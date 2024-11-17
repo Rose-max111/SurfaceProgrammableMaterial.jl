@@ -44,6 +44,7 @@ function __main__(typetemp::Type, n::Int, m::Int, nbatch::Int; Tmax=2.0, epsilon
     lowest_temperature = -1/log(epsilon)
     tg = typetemp(Tmax, width, lowest_temperature)
     flip_group = parallel_scheme(SimulatedAnnealingHamiltonian(n, m, CellularAutomata1D(110)); input_fixed)
+    @show sort!(vcat(flip_group...))
     input_fixed == true && @assert sort!(vcat(flip_group...)) == collect(n+1:n*m) "flip_group is not correct"
     moving_speed = evaluate_p_percentage_velocity(tg, n, m, nbatch, 0.50; 
                     CUDA_functional = true, flip_scheme = CUDA.cu.(flip_group))
@@ -61,10 +62,12 @@ function __makefilemain__()
     input_fixed = parse(Bool, ARGS[8])
     cuda_device = parse(Int, ARGS[9])
 
+    @show input_fixed
+
     CUDA.device!(cuda_device)
     for m in m_minimum:m_step:m_maximum
         velocity = __main__(temperature_type, n, m, nbatch; width, input_fixed)
-        filepath = joinpath(@__DIR__, "data_$(temperature_type)/n=$(n)_m=$(m)_width=$(width)_nbatch=$(nbatch).txt")
+        filepath = input_fixed == true ? joinpath(@__DIR__, "data_$(temperature_type)_inputfixed/n=$(n)_m=$(m)_width=$(width)_nbatch=$(nbatch).txt") : joinpath(@__DIR__, "data_$(temperature_type)/n=$(n)_m=$(m)_width=$(width)_nbatch=$(nbatch).txt")
         open(filepath, "w") do file
             println(file, velocity)
         end
