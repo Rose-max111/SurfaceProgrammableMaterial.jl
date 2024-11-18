@@ -2,6 +2,7 @@ abstract type TemperatureRule end
 abstract type TemperatureGradient <: TemperatureRule end
 abstract type ColumnWiseGradient <: TemperatureGradient end
 abstract type TemperatureCollective <: TemperatureRule end
+abstract type StationaryColumnWiseGradient <: ColumnWiseGradient end
 
 # Gaussian temperature gradient: T(distance) = amplitude * exp(-(distance)^2 / width^2) + lowest_temperature
 struct GaussianGradient <: ColumnWiseGradient
@@ -48,6 +49,13 @@ function evaluate_temperature(lt::LinearTemperature, proportion::Real) # proport
     return lt.high_temperature - proportion * (lt.high_temperature - lt.low_temperature)
 end
 
+struct StationaryExponentialGradient <: StationaryColumnWiseGradient
+    highest_temperature::Float64
+    base::Float64
+end
+function evaluate_temperature(seg::StationaryExponentialGradient, distance::Real) # distance toward highest temperature
+    return seg.highest_temperature * seg.base ^ (abs(distance))
+end
 
 abstract type TransitionRule end
 struct HeatBath <: TransitionRule end

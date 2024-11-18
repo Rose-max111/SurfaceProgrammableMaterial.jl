@@ -29,6 +29,17 @@ end
     @test SurfaceProgrammableMaterial.lowest_temperature(sg) == 1e-5
 end
 
+@testset "temperature stationary gradient" begin
+    seg = StationaryExponentialGradient(3.0, 0.7)
+    @test SurfaceProgrammableMaterial.evaluate_temperature(seg, 1) ≈ 3.0*0.7
+    @test SurfaceProgrammableMaterial.evaluate_temperature(seg, 2) ≈ 3.0*0.7^2
+    sa = SimulatedAnnealingHamiltonian(8, 7, CellularAutomata1D(110))
+    r = SARuntime(Float64, sa, 10)
+    update_temperature!(r, seg, 5, 10, false)
+    @test reshape(view(r.temperature, :, 1), sa.n, sa.m)[1, :] == [0.7^i * 3.0 for i in 6:-1:0]
+    update_temperature!(r, seg, 7, 10, false)
+    @test reshape(view(r.temperature, :, 1), sa.n, sa.m)[1, :] == [0.7^i * 3.0 for i in 6:-1:0]
+end
 
 @testset "temperature collective" begin
     tl = LinearTemperature(5.0, 1.0)

@@ -8,7 +8,7 @@ using COPT
 using HiGHS
 
 # Temperature gradient
-export GaussianGradient, ExponentialGradient, SigmoidGradient, ColumnWiseGradient, TemperatureGradient
+export GaussianGradient, ExponentialGradient, SigmoidGradient, ColumnWiseGradient, TemperatureGradient, StationaryExponentialGradient, StationaryColumnWiseGradient
 
 # Temperature collective
 export LinearTemperature, TemperatureCollective

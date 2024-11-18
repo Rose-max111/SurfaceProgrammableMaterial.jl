@@ -154,6 +154,12 @@ function update_temperature!(runtime::SARuntime, temprule::TemperatureCollective
     view(runtime.temperature, :, 1) .= this_temperature
     view(runtime.temperature, :, 2:size(runtime.temperature, 2)) .= view(runtime.temperature, :, 1:1)
 end
+function update_temperature!(runtime::SARuntime, temprule::StationaryColumnWiseGradient, t::Integer, annealing_time::Integer, reverse_direction::Bool)
+    sa = runtime.hamiltonian
+    temperature_matrix!(reshape(view(runtime.temperature, :, 1), sa.n, sa.m), temprule, reverse_direction == true ? (0:(sa.m-1)) : ((sa.m-1):-1:0), 0)
+    view(runtime.temperature, :, 2:size(runtime.temperature, 2)) .= view(runtime.temperature, :, 1:1)
+end
+    
 function temperature_matrix!(output::AbstractMatrix, tg::ColumnWiseGradient, offsets::AbstractArray, middle_position::Real)
     offsets = _match_device(output, offsets)
     t = evaluate_temperature.(Ref(tg), offsets .- middle_position)
