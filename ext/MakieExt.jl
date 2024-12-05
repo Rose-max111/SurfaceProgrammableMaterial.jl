@@ -60,7 +60,7 @@ end
 
 function SurfaceProgrammableMaterial.show_effective_temperature_curve(tg::TemperatureGradient, minimum_distance::Real, maximum_distance::Real)
     x = range(minimum_distance, maximum_distance, length=500)
-    y = [effective_temp(tg, i) for i in x] # 第i层为结尾的gadget的effective temperature
+    y = [min(10,effective_temp(tg, i)) for i in x] # 第i层为结尾的gadget的effective temperature
     y1 = [effective_temp(tg, i+1) / effective_temp(tg, i) for i in x]
     y2 = [effective_temp_spin(tg, i) for i in x]
     y3 = [effective_temp_spin(tg, i+1) / effective_temp_spin(tg, i) for i in x]
@@ -72,7 +72,7 @@ function SurfaceProgrammableMaterial.show_effective_temperature_curve(tg::Temper
     lines!(ax, x, y1, label = "Teff(i+1) / Teff(i) toy")
     # lines!(ax, x, y2, label = "effective temp spinmodel")
     # lines!(ax, x, y3, label = "Teff(i+1) / Teff(i) spin")
-    axislegend(ax)
+    axislegend(ax,position=:lt)
     # @show minimum(y)
     return fig
 end

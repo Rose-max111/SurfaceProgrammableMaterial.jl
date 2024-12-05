@@ -9,6 +9,7 @@ using HiGHS
 
 # Temperature gradient
 export GaussianGradient, ExponentialGradient, SigmoidGradient, ColumnWiseGradient, TemperatureGradient, StationaryExponentialGradient, StationaryColumnWiseGradient
+export StepExponentialGradient
 
 # Temperature collective
 export LinearTemperature, TemperatureCollective
@@ -31,7 +32,7 @@ export parallel_scheme
 export query_model, nspin, ground_state, IsingGadget
 
 # Visualize method
-export show_temperature_matrix, animate_tracker, show_temperature_curve
+export show_temperature_matrix, animate_tracker, show_temperature_curve, show_effective_temperature_curve
 
 # Spin model
 export IsingModel, spin_model_construction, SpinSARuntime, track_equilibration_plane!

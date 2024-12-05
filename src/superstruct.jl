@@ -25,7 +25,7 @@ end
 function evaluate_temperature(eg::ExponentialGradient, distance::Real)
     return eg.amplitude * exp(-abs(distance/eg.width)) + eg.lowest_temperature
 end
-cutoff_distance(eg::ExponentialGradient) = -eg.width * log(eg.lowest_temperature/eg.amplitude)
+cutoff_distance(eg::ExponentialGradient) = -eg.width * log(max(1e-6, eg.lowest_temperature)/eg.amplitude)
 lowest_temperature(eg::ExponentialGradient) = eg.lowest_temperature
 
 # SigmoidGradient temperature gradient: T(distance) = low_temperature + (high_temperature - low_temperature) / (1 + exp(-distance / width))
@@ -56,6 +56,17 @@ end
 function evaluate_temperature(seg::StationaryExponentialGradient, distance::Real) # distance toward highest temperature
     return seg.highest_temperature * seg.base ^ (abs(distance))
 end
+
+struct StepExponentialGradient <: ColumnWiseGradient
+    highest_temperature::Float64
+    base::Float64
+    lowest_temperature::Float64
+end
+function evaluate_temperature(gg::StepExponentialGradient, distance::Real)
+    distance >= 0 && return gg.highest_temperature
+    return gg.highest_temperature * gg.base^(distance) + gg.lowest_temperature
+end
+lowest_temperature(gg::StepExponentialGradient) = gg.lowest_temperature
 
 abstract type TransitionRule end
 struct HeatBath <: TransitionRule end

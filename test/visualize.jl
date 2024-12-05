@@ -27,3 +27,7 @@ using SurfaceProgrammableMaterial:evaluate_temperature
     @show SurfaceProgrammableMaterial.unsafe_energy(sa, tracker.state[35], 149, 1)
     @show SurfaceProgrammableMaterial.unsafe_energy(sa, tracker.state[36], 149, 1)
 end
+
+tg = ExponentialGradient(30.0, 1.0, 0)
+SurfaceProgrammableMaterial.cutoff_distance(tg)
+show_effective_temperature_curve(tg, -40, 10)
